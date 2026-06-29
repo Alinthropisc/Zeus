@@ -20,7 +20,6 @@ allow = [
     "0BSD",
 ]
 copyleft = "warn"
-allow-osi-approved = true
 
 [bans]
 multiple-versions = "warn"
