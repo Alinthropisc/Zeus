@@ -17,11 +17,7 @@ pub struct PrinceStrategy {
 }
 
 impl PrinceStrategy {
-    pub fn new(
-        username: impl Into<String>,
-        elements: Vec<String>,
-        max_chains: usize,
-    ) -> Self {
+    pub fn new(username: impl Into<String>, elements: Vec<String>, max_chains: usize) -> Self {
         Self {
             username: username.into(),
             elements,
@@ -45,7 +41,9 @@ impl PrinceStrategy {
 }
 
 impl AttackStrategy for PrinceStrategy {
-    fn name(&self) -> &'static str { "prince" }
+    fn name(&self) -> &'static str {
+        "prince"
+    }
 
     fn credentials(&self) -> CredentialStream {
         let username = self.username.clone();
@@ -58,14 +56,16 @@ impl AttackStrategy for PrinceStrategy {
         let mut creds: Vec<Credential> = Vec::new();
 
         let accept = |s: &str| s.len() >= min_len && s.len() <= max_len;
-        let at_limit = |c: &Vec<Credential>| limit.map_or(false, |l| c.len() as u64 >= l);
+        let at_limit = |c: &Vec<Credential>| limit.is_some_and(|l| c.len() as u64 >= l);
 
         // Chain 1: single elements
         for e in &elements {
             if accept(e) {
                 creds.push(Credential::new(username.clone(), e.clone()));
             }
-            if at_limit(&creds) { break; }
+            if at_limit(&creds) {
+                break;
+            }
         }
 
         // Chain 2: pairs
@@ -76,7 +76,9 @@ impl AttackStrategy for PrinceStrategy {
                     if accept(&combined) {
                         creds.push(Credential::new(username.clone(), combined));
                     }
-                    if at_limit(&creds) { break 'outer2; }
+                    if at_limit(&creds) {
+                        break 'outer2;
+                    }
                 }
             }
         }
@@ -90,7 +92,9 @@ impl AttackStrategy for PrinceStrategy {
                         if accept(&combined) {
                             creds.push(Credential::new(username.clone(), combined));
                         }
-                        if at_limit(&creds) { break 'outer3; }
+                        if at_limit(&creds) {
+                            break 'outer3;
+                        }
                     }
                 }
             }
@@ -106,9 +110,17 @@ impl AttackStrategy for PrinceStrategy {
     fn estimated_count(&self) -> Option<u64> {
         let n = self.elements.len() as u64;
         let mut total = n;
-        if self.max_chains >= 2 { total = total.saturating_add(n.saturating_mul(n)); }
-        if self.max_chains >= 3 { total = total.saturating_add(n.saturating_mul(n).saturating_mul(n)); }
-        Some(if let Some(lim) = self.limit { total.min(lim) } else { total })
+        if self.max_chains >= 2 {
+            total = total.saturating_add(n.saturating_mul(n));
+        }
+        if self.max_chains >= 3 {
+            total = total.saturating_add(n.saturating_mul(n).saturating_mul(n));
+        }
+        Some(if let Some(lim) = self.limit {
+            total.min(lim)
+        } else {
+            total
+        })
     }
 }
 
@@ -131,7 +143,11 @@ mod tests {
         let s = PrinceStrategy::new("u", words(&["cat", "dog", "fox"]), 1);
         let creds = collect_sync(&s);
         assert_eq!(creds.len(), 3);
-        assert!(creds.iter().all(|c| ["cat", "dog", "fox"].contains(&c.password.as_str())));
+        assert!(
+            creds
+                .iter()
+                .all(|c| ["cat", "dog", "fox"].contains(&c.password.as_str()))
+        );
     }
 
     #[test]
@@ -149,8 +165,7 @@ mod tests {
     #[test]
     fn prince_len_filter() {
         // Only words of length exactly 3 should pass with bounds [3,3]
-        let s = PrinceStrategy::new("u", words(&["hi", "hey", "hello"]), 1)
-            .with_len_bounds(3, 3);
+        let s = PrinceStrategy::new("u", words(&["hi", "hey", "hello"]), 1).with_len_bounds(3, 3);
         let creds = collect_sync(&s);
         assert_eq!(creds.len(), 1);
         assert_eq!(creds[0].password, "hey");
@@ -158,8 +173,7 @@ mod tests {
 
     #[test]
     fn prince_limit() {
-        let s = PrinceStrategy::new("u", words(&["a", "b", "c", "d"]), 2)
-            .with_limit(3);
+        let s = PrinceStrategy::new("u", words(&["a", "b", "c", "d"]), 2).with_limit(3);
         let creds = collect_sync(&s);
         assert_eq!(creds.len(), 3);
     }
@@ -190,8 +204,7 @@ mod tests {
 
     #[test]
     fn prince_limit_via_estimated_count() {
-        let s = PrinceStrategy::new("u", words(&["a", "b", "c"]), 2)
-            .with_limit(5);
+        let s = PrinceStrategy::new("u", words(&["a", "b", "c"]), 2).with_limit(5);
         assert_eq!(s.estimated_count(), Some(5));
     }
 }

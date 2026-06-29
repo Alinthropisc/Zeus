@@ -113,7 +113,10 @@ impl PriorityStrategy {
                 break;
             }
             let priority = (self.scorer)(&cred);
-            heap.push(PrioritizedCredential { priority, credential: cred });
+            heap.push(PrioritizedCredential {
+                priority,
+                credential: cred,
+            });
             count += 1;
         }
 
@@ -162,15 +165,21 @@ mod tests {
     }
 
     impl StaticStrategy {
-        fn new(creds: Vec<Credential>) -> Self { Self { creds } }
+        fn new(creds: Vec<Credential>) -> Self {
+            Self { creds }
+        }
     }
 
     impl AttackStrategy for StaticStrategy {
-        fn name(&self) -> &'static str { "static" }
+        fn name(&self) -> &'static str {
+            "static"
+        }
         fn credentials(&self) -> CredentialStream {
             Box::pin(stream_iter(self.creds.clone()))
         }
-        fn estimated_count(&self) -> Option<u64> { Some(self.creds.len() as u64) }
+        fn estimated_count(&self) -> Option<u64> {
+            Some(self.creds.len() as u64)
+        }
     }
 
     fn cred(u: &str, p: &str) -> Credential {
@@ -197,9 +206,18 @@ mod tests {
 
     #[test]
     fn prioritized_cred_ordering() {
-        let a = PrioritizedCredential { priority: 10, credential: cred("u", "a") };
-        let b = PrioritizedCredential { priority: 5,  credential: cred("u", "b") };
-        let c = PrioritizedCredential { priority: 20, credential: cred("u", "c") };
+        let a = PrioritizedCredential {
+            priority: 10,
+            credential: cred("u", "a"),
+        };
+        let b = PrioritizedCredential {
+            priority: 5,
+            credential: cred("u", "b"),
+        };
+        let c = PrioritizedCredential {
+            priority: 20,
+            credential: cred("u", "c"),
+        };
 
         let mut heap = BinaryHeap::new();
         heap.push(a);
@@ -226,9 +244,9 @@ mod tests {
     #[tokio::test]
     async fn priority_strategy_orders_by_score() {
         let creds = vec![
-            cred("u", "averylongpassword"),  // low priority
-            cred("u", "password"),            // common → high priority
-            cred("u", "ab"),                  // short → medium
+            cred("u", "averylongpassword"), // low priority
+            cred("u", "password"),          // common → high priority
+            cred("u", "ab"),                // short → medium
         ];
 
         let inner = Box::new(StaticStrategy::new(creds));

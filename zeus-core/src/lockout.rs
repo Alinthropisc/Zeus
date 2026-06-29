@@ -38,7 +38,8 @@ impl LockoutTracker {
     /// (e.g. `"30 minutes"`).  It is logged for operator awareness only.
     pub fn mark_locked(&mut self, username: &str, hint: Option<String>) {
         self.total_lockouts += 1;
-        self.locked_accounts.insert(username.to_string(), Instant::now());
+        self.locked_accounts
+            .insert(username.to_string(), Instant::now());
         tracing::warn!("Account locked: {} (hint: {:?})", username, hint);
     }
 
@@ -155,7 +156,10 @@ mod tests {
         t.mark_locked("dave", None);
         // Sleep briefly to confirm elapsed time does not matter.
         thread::sleep(Duration::from_millis(5));
-        assert!(t.should_skip("dave"), "no cooldown configured → should skip indefinitely");
+        assert!(
+            t.should_skip("dave"),
+            "no cooldown configured → should skip indefinitely"
+        );
     }
 
     #[test]
@@ -167,7 +171,11 @@ mod tests {
         thread::sleep(Duration::from_millis(10));
         t.cleanup_expired();
 
-        assert_eq!(t.locked_count(), 0, "expired entry should have been removed");
+        assert_eq!(
+            t.locked_count(),
+            0,
+            "expired entry should have been removed"
+        );
     }
 
     #[test]

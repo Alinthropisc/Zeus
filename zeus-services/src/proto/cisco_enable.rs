@@ -12,11 +12,11 @@
 //!      - Contains "#"       → success (enable prompt received).
 //!      - Contains "Password:" again, "bad", "fail", "denied", "attempt" → failure.
 
+use crate::net::TcpConnection;
 use async_trait::async_trait;
 use std::time::Instant;
 use tracing::debug;
 use zeus_core::{AttackConfig, AttackResult, Credential, Protocol, Target, ZeusError};
-use crate::net::TcpConnection;
 
 use crate::resolve_addr;
 
@@ -39,8 +39,12 @@ fn strip_iac(buf: &[u8]) -> Vec<u8> {
 
 #[async_trait]
 impl Protocol for CiscoEnableProtocol {
-    fn name(&self) -> &'static str { "cisco-enable" }
-    fn default_port(&self) -> u16 { 23 }
+    fn name(&self) -> &'static str {
+        "cisco-enable"
+    }
+    fn default_port(&self) -> u16 {
+        23
+    }
     fn description(&self) -> &'static str {
         "Cisco IOS enable password authentication (privileged EXEC mode)"
     }

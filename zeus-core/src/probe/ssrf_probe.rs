@@ -1,6 +1,6 @@
 //! SSRF probes via OAuth callback and cloud metadata endpoints — Phase 7.
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use thiserror::Error;
 
 use crate::probe::jwt_probe::Severity;
@@ -98,9 +98,9 @@ impl SsrfVector {
         match self {
             Self::OAuthRedirectUri { .. } => "oauth-redirect-uri".into(),
             Self::UrlParameter { param_name } => format!("url-param:{param_name}"),
-            Self::XForwardedFor              => "x-forwarded-for".into(),
-            Self::RefererHeader              => "referer".into(),
-            Self::WebhookUrl                 => "webhook-url".into(),
+            Self::XForwardedFor => "x-forwarded-for".into(),
+            Self::RefererHeader => "referer".into(),
+            Self::WebhookUrl => "webhook-url".into(),
         }
     }
 }
@@ -188,9 +188,7 @@ impl SsrfProbe {
         let vector_label = vector.label();
 
         for target in &self.targets {
-            let result = self
-                .try_one(client, &vector, endpoint, target)
-                .await;
+            let result = self.try_one(client, &vector, endpoint, target).await;
 
             match result {
                 Ok(finding) => findings.push(finding),
@@ -209,7 +207,10 @@ impl SsrfProbe {
             url: format!("http://{}/ssrf-probe", self.canary_host),
             expected_indicator: None,
         };
-        if let Ok(f) = self.try_one(client, &vector, endpoint, &canary_target).await {
+        if let Ok(f) = self
+            .try_one(client, &vector, endpoint, &canary_target)
+            .await
+        {
             findings.push(f);
         }
 
@@ -226,9 +227,15 @@ impl SsrfProbe {
             SsrfVector::OAuthRedirectUri {
                 callback_url: format!("http://{}/callback", self.canary_host),
             },
-            SsrfVector::UrlParameter { param_name: "url".into() },
-            SsrfVector::UrlParameter { param_name: "redirect".into() },
-            SsrfVector::UrlParameter { param_name: "next".into() },
+            SsrfVector::UrlParameter {
+                param_name: "url".into(),
+            },
+            SsrfVector::UrlParameter {
+                param_name: "redirect".into(),
+            },
+            SsrfVector::UrlParameter {
+                param_name: "next".into(),
+            },
             SsrfVector::XForwardedFor,
             SsrfVector::RefererHeader,
             SsrfVector::WebhookUrl,
@@ -238,7 +245,7 @@ impl SsrfProbe {
         for vector in vectors {
             match self.probe_vector(client, vector, endpoint).await {
                 Ok(mut fs) => all.append(&mut fs),
-                Err(e)     => tracing::warn!(error = %e, "probe_vector failed"),
+                Err(e) => tracing::warn!(error = %e, "probe_vector failed"),
             }
         }
         Ok(all)
@@ -256,36 +263,26 @@ impl SsrfProbe {
         let target_url = target.url.as_str();
 
         let (status, body) = match vector {
-            SsrfVector::OAuthRedirectUri { .. } => {
-                client
-                    .get_with_param(endpoint, "redirect_uri", target_url)
-                    .await
-                    .map_err(|e| anyhow!("HTTP: {e}"))?
-            }
-            SsrfVector::UrlParameter { param_name } => {
-                client
-                    .get_with_param(endpoint, param_name, target_url)
-                    .await
-                    .map_err(|e| anyhow!("HTTP: {e}"))?
-            }
-            SsrfVector::XForwardedFor => {
-                client
-                    .get_with_headers(endpoint, &[("X-Forwarded-For", target_url)])
-                    .await
-                    .map_err(|e| anyhow!("HTTP: {e}"))?
-            }
-            SsrfVector::RefererHeader => {
-                client
-                    .get_with_headers(endpoint, &[("Referer", target_url)])
-                    .await
-                    .map_err(|e| anyhow!("HTTP: {e}"))?
-            }
-            SsrfVector::WebhookUrl => {
-                client
-                    .get_with_param(endpoint, "webhook_url", target_url)
-                    .await
-                    .map_err(|e| anyhow!("HTTP: {e}"))?
-            }
+            SsrfVector::OAuthRedirectUri { .. } => client
+                .get_with_param(endpoint, "redirect_uri", target_url)
+                .await
+                .map_err(|e| anyhow!("HTTP: {e}"))?,
+            SsrfVector::UrlParameter { param_name } => client
+                .get_with_param(endpoint, param_name, target_url)
+                .await
+                .map_err(|e| anyhow!("HTTP: {e}"))?,
+            SsrfVector::XForwardedFor => client
+                .get_with_headers(endpoint, &[("X-Forwarded-For", target_url)])
+                .await
+                .map_err(|e| anyhow!("HTTP: {e}"))?,
+            SsrfVector::RefererHeader => client
+                .get_with_headers(endpoint, &[("Referer", target_url)])
+                .await
+                .map_err(|e| anyhow!("HTTP: {e}"))?,
+            SsrfVector::WebhookUrl => client
+                .get_with_param(endpoint, "webhook_url", target_url)
+                .await
+                .map_err(|e| anyhow!("HTTP: {e}"))?,
         };
 
         let snippet: String = body.chars().take(512).collect();
@@ -304,7 +301,11 @@ impl SsrfProbe {
             target: target.url.clone(),
             successful,
             response_snippet: snippet,
-            severity: if successful { Severity::Critical } else { Severity::Low },
+            severity: if successful {
+                Severity::Critical
+            } else {
+                Severity::Low
+            },
         })
     }
 }
@@ -346,15 +347,23 @@ mod tests {
     #[test]
     fn vector_labels_are_distinct() {
         let vectors = vec![
-            SsrfVector::OAuthRedirectUri { callback_url: "http://x.com".into() },
-            SsrfVector::UrlParameter { param_name: "url".into() },
+            SsrfVector::OAuthRedirectUri {
+                callback_url: "http://x.com".into(),
+            },
+            SsrfVector::UrlParameter {
+                param_name: "url".into(),
+            },
             SsrfVector::XForwardedFor,
             SsrfVector::RefererHeader,
             SsrfVector::WebhookUrl,
         ];
         let labels: Vec<_> = vectors.iter().map(|v| v.label()).collect();
         let unique: std::collections::HashSet<_> = labels.iter().collect();
-        assert_eq!(labels.len(), unique.len(), "all vector labels must be distinct");
+        assert_eq!(
+            labels.len(),
+            unique.len(),
+            "all vector labels must be distinct"
+        );
     }
 
     #[test]

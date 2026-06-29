@@ -20,6 +20,13 @@ pub enum CryptoError {
 
 // ── Hashing ─────────────────────────────────────────────────────────────────
 
+/// Compute an MD5 digest and return the raw 16-byte hash.
+///
+/// ```
+/// let hash = zeus_crypto::md5(b"hello");
+/// assert_eq!(hash.len(), 16);
+/// assert_eq!(zeus_crypto::to_hex(&hash), "5d41402abc4b2a76b9719d911017c592");
+/// ```
 pub fn md5(data: &[u8]) -> [u8; 16] {
     let mut h = Md5::new();
     h.update(data);
@@ -32,6 +39,16 @@ pub fn sha1(data: &[u8]) -> [u8; 20] {
     h.finalize().into()
 }
 
+/// Compute a SHA-256 digest and return the raw 32-byte hash.
+///
+/// ```
+/// let hash = zeus_crypto::sha256(b"");
+/// assert_eq!(hash.len(), 32);
+/// assert_eq!(
+///     zeus_crypto::to_hex(&hash),
+///     "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+/// );
+/// ```
 pub fn sha256(data: &[u8]) -> [u8; 32] {
     let mut h = Sha256::new();
     h.update(data);
@@ -66,6 +83,11 @@ pub fn hmac_sha256(key: &[u8], data: &[u8]) -> [u8; 32] {
 
 // ── Encoding ────────────────────────────────────────────────────────────────
 
+/// Encode bytes as a lowercase hex string.
+///
+/// ```
+/// assert_eq!(zeus_crypto::to_hex(b"\xde\xad"), "dead");
+/// ```
 pub fn to_hex(data: &[u8]) -> String {
     hex::encode(data)
 }
@@ -74,6 +96,11 @@ pub fn from_hex(s: &str) -> Result<Vec<u8>, CryptoError> {
     Ok(hex::decode(s)?)
 }
 
+/// Encode bytes as standard base64 (with padding).
+///
+/// ```
+/// assert_eq!(zeus_crypto::to_base64(b"hello"), "aGVsbG8=");
+/// ```
 pub fn to_base64(data: &[u8]) -> String {
     B64.encode(data)
 }
@@ -86,7 +113,11 @@ pub fn from_base64(s: &str) -> Result<Vec<u8>, CryptoError> {
 
 /// CRAM-MD5 response as used by IMAP/SMTP AUTH CRAM-MD5.
 /// Returns `"<username> <hex(HMAC-MD5(password, challenge))"`.
-pub fn cram_md5_response(username: &str, password: &str, challenge_b64: &str) -> Result<String, CryptoError> {
+pub fn cram_md5_response(
+    username: &str,
+    password: &str,
+    challenge_b64: &str,
+) -> Result<String, CryptoError> {
     let challenge = from_base64(challenge_b64)?;
     let digest = hmac_md5(password.as_bytes(), &challenge);
     Ok(format!("{} {}", username, to_hex(&digest)))
@@ -94,6 +125,12 @@ pub fn cram_md5_response(username: &str, password: &str, challenge_b64: &str) ->
 
 /// NTLM NT hash (MD4 of UTF-16LE password).
 /// Used by SMB, MSSQL, and similar Windows protocols.
+///
+/// ```
+/// // NT hash of "password" is a well-known rainbow-table vector.
+/// let hash = zeus_crypto::ntlm_nt_hash("password");
+/// assert_eq!(zeus_crypto::to_hex(&hash), "8846f7eaee8fb117ad06bdd830b7586c");
+/// ```
 pub fn ntlm_nt_hash(password: &str) -> [u8; 16] {
     let utf16: Vec<u8> = password
         .encode_utf16()
@@ -124,7 +161,10 @@ mod tests {
 
     #[test]
     fn sha1_abc() {
-        assert_eq!(to_hex(&sha1(b"abc")), "a9993e364706816aba3e25717850c26c9cd0d89d");
+        assert_eq!(
+            to_hex(&sha1(b"abc")),
+            "a9993e364706816aba3e25717850c26c9cd0d89d"
+        );
     }
 
     #[test]
@@ -172,8 +212,10 @@ mod tests {
     #[test]
     fn md4_known_bytes() {
         // MD4 of UTF-16LE bytes for "password" (lowercase)
-        let bytes: &[u8] = &[0x70, 0x00, 0x61, 0x00, 0x73, 0x00, 0x73, 0x00,
-                              0x77, 0x00, 0x6F, 0x00, 0x72, 0x00, 0x64, 0x00];
+        let bytes: &[u8] = &[
+            0x70, 0x00, 0x61, 0x00, 0x73, 0x00, 0x73, 0x00, 0x77, 0x00, 0x6F, 0x00, 0x72, 0x00,
+            0x64, 0x00,
+        ];
         assert_eq!(to_hex(&md4(bytes)), "8846f7eaee8fb117ad06bdd830b7586c");
     }
 
@@ -185,8 +227,10 @@ mod tests {
             .collect();
         assert_eq!(
             bytes,
-            vec![0x70, 0x00, 0x61, 0x00, 0x73, 0x00, 0x73, 0x00,
-                 0x77, 0x00, 0x6F, 0x00, 0x72, 0x00, 0x64, 0x00]
+            vec![
+                0x70, 0x00, 0x61, 0x00, 0x73, 0x00, 0x73, 0x00, 0x77, 0x00, 0x6F, 0x00, 0x72, 0x00,
+                0x64, 0x00
+            ]
         );
     }
 
@@ -194,7 +238,10 @@ mod tests {
     fn ntlm_nt_hash_known() {
         // NT hash of "password" (lowercase) = 8846f7eaee8fb117ad06bdd830b7586c
         // (universally-known NTLM rainbow-table test vector)
-        assert_eq!(to_hex(&ntlm_nt_hash("password")), "8846f7eaee8fb117ad06bdd830b7586c");
+        assert_eq!(
+            to_hex(&ntlm_nt_hash("password")),
+            "8846f7eaee8fb117ad06bdd830b7586c"
+        );
     }
 
     #[test]

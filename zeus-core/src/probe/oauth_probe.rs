@@ -120,7 +120,11 @@ impl OAuthMisconfigProbe {
         self
     }
 
-    pub fn with_state(mut self, sent: impl Into<String>, echoed: Option<impl Into<String>>) -> Self {
+    pub fn with_state(
+        mut self,
+        sent: impl Into<String>,
+        echoed: Option<impl Into<String>>,
+    ) -> Self {
         self.sent_state = Some(sent.into());
         self.echoed_state = echoed.map(Into::into);
         self
@@ -152,8 +156,13 @@ impl OAuthMisconfigProbe {
             if uri.contains('*') {
                 findings.push(format!("wildcard pattern in redirect URI: '{uri}'"));
             }
-            if uri.starts_with("http://") && !uri.contains("localhost") && !uri.contains("127.0.0.1") {
-                findings.push(format!("non-TLS redirect URI for non-localhost destination: '{uri}'"));
+            if uri.starts_with("http://")
+                && !uri.contains("localhost")
+                && !uri.contains("127.0.0.1")
+            {
+                findings.push(format!(
+                    "non-TLS redirect URI for non-localhost destination: '{uri}'"
+                ));
             }
         }
 
@@ -164,10 +173,15 @@ impl OAuthMisconfigProbe {
             ))
         } else {
             Ok(ProbeResult::new(
-                format!("Open Redirect: suspicious redirect_uri patterns — {}", findings.join("; ")),
+                format!(
+                    "Open Redirect: suspicious redirect_uri patterns — {}",
+                    findings.join("; ")
+                ),
                 Severity::High,
             )
-            .with_remediation("Remove wildcards and enforce HTTPS for all non-localhost redirect URIs."))
+            .with_remediation(
+                "Remove wildcards and enforce HTTPS for all non-localhost redirect URIs.",
+            ))
         }
     }
 
@@ -258,7 +272,9 @@ impl OAuthMisconfigProbe {
 }
 
 impl Default for OAuthMisconfigProbe {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -278,8 +294,7 @@ mod tests {
 
     #[test]
     fn open_redirect_wildcard_is_high() {
-        let probe = OAuthMisconfigProbe::new()
-            .with_redirect_uris(["https://example.com/*"]);
+        let probe = OAuthMisconfigProbe::new().with_redirect_uris(["https://example.com/*"]);
         let result = probe.probe_open_redirect().unwrap();
         assert_eq!(result.severity, Severity::High);
         assert!(result.finding.contains("wildcard"));
@@ -287,8 +302,8 @@ mod tests {
 
     #[test]
     fn open_redirect_good_uris_is_low() {
-        let probe = OAuthMisconfigProbe::new()
-            .with_redirect_uris(["https://app.example.com/callback"]);
+        let probe =
+            OAuthMisconfigProbe::new().with_redirect_uris(["https://app.example.com/callback"]);
         let result = probe.probe_open_redirect().unwrap();
         assert_eq!(result.severity, Severity::Low);
     }
@@ -323,16 +338,14 @@ mod tests {
 
     #[test]
     fn state_mismatch_is_critical() {
-        let probe = OAuthMisconfigProbe::new()
-            .with_state("abc123", Some("xyz789"));
+        let probe = OAuthMisconfigProbe::new().with_state("abc123", Some("xyz789"));
         let result = probe.probe_state_bypass().unwrap();
         assert_eq!(result.severity, Severity::Critical);
     }
 
     #[test]
     fn state_match_is_low() {
-        let probe = OAuthMisconfigProbe::new()
-            .with_state("abc123", Some("abc123"));
+        let probe = OAuthMisconfigProbe::new().with_state("abc123", Some("abc123"));
         let result = probe.probe_state_bypass().unwrap();
         assert_eq!(result.severity, Severity::Low);
     }

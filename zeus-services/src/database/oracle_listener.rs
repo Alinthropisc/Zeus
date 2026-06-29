@@ -18,38 +18,38 @@
 //! This module does NOT touch the Oracle database itself; it speaks only to
 //! the listener process.
 
+use crate::net::TcpConnection;
 use async_trait::async_trait;
 use std::net::ToSocketAddrs;
 use std::time::Instant;
 use tracing::debug;
 use zeus_core::{AttackConfig, AttackResult, Credential, Protocol, Target, ZeusError};
-use crate::net::TcpConnection;
 
 pub struct OracleListenerProtocol;
 
 // ── TNS constants (shared with oracle.rs conceptually) ───────────────────────
 
-const TNS_TYPE_CONNECT:  u8 = 1;
-const TNS_TYPE_ACCEPT:   u8 = 2;
-const TNS_TYPE_REFUSE:   u8 = 4;
+const TNS_TYPE_CONNECT: u8 = 1;
+const TNS_TYPE_ACCEPT: u8 = 2;
+const TNS_TYPE_REFUSE: u8 = 4;
 const TNS_TYPE_REDIRECT: u8 = 5;
-const TNS_TYPE_DATA:     u8 = 6;
-const TNS_HDR_LEN:       usize = 8;
-const TNS_TYPE_OFFSET:   usize = 4;
+const TNS_TYPE_DATA: u8 = 6;
+const TNS_HDR_LEN: usize = 8;
+const TNS_TYPE_OFFSET: usize = 4;
 
 // CONNECT fixed-header constants (same as oracle.rs)
-const TNS_CONNECT_VERSION:        u16 = 0x013A;
+const TNS_CONNECT_VERSION: u16 = 0x013A;
 const TNS_CONNECT_VERSION_COMPAT: u16 = 0x0134;
-const TNS_SERVICE_OPTIONS:        u16 = 0x0C41;
-const TNS_SDU:                    u16 = 0x0800;
-const TNS_TDU:                    u16 = 0x7FFF;
-const TNS_NT_PROTOCOL:            u16 = 0x0000;
-const TNS_LINE_TURNAROUND:        u16 = 0x0000;
-const TNS_VALUE_OF_ONE:           u16 = 0x0001;
-const TNS_MAX_RECV_CONNECT:       u32 = 512;
-const TNS_CONNECT_FLAGS:          u8  = 0x04;
-const TNS_CONNECT_FIXED_LEN:      usize = 28;
-const TNS_CONNECT_DATA_OFFSET:    u16 = (TNS_HDR_LEN + TNS_CONNECT_FIXED_LEN) as u16;
+const TNS_SERVICE_OPTIONS: u16 = 0x0C41;
+const TNS_SDU: u16 = 0x0800;
+const TNS_TDU: u16 = 0x7FFF;
+const TNS_NT_PROTOCOL: u16 = 0x0000;
+const TNS_LINE_TURNAROUND: u16 = 0x0000;
+const TNS_VALUE_OF_ONE: u16 = 0x0001;
+const TNS_MAX_RECV_CONNECT: u32 = 512;
+const TNS_CONNECT_FLAGS: u8 = 0x04;
+const TNS_CONNECT_FIXED_LEN: usize = 28;
+const TNS_CONNECT_DATA_OFFSET: u16 = (TNS_HDR_LEN + TNS_CONNECT_FIXED_LEN) as u16;
 
 // ── TNS packet helpers ────────────────────────────────────────────────────────
 
@@ -60,7 +60,7 @@ fn tns_packet(pkt_type: u8, body: &[u8]) -> Vec<u8> {
     pkt.extend_from_slice(&total.to_be_bytes());
     pkt.extend_from_slice(&0u16.to_be_bytes()); // checksum
     pkt.push(pkt_type);
-    pkt.push(0x00);                              // reserved
+    pkt.push(0x00); // reserved
     pkt.extend_from_slice(&0u16.to_be_bytes()); // header checksum
     pkt.extend_from_slice(body);
     pkt
@@ -112,14 +112,14 @@ pub fn listener_status_cmd() -> &'static [u8] {
 
 /// STATUS command with password argument.
 pub fn listener_status_with_password(password: &str) -> String {
-    format!(
-        "(CONNECT_DATA=(COMMAND=status)(ARGUMENT=listener_password)(PASSWORD={password}))\x0a"
-    )
+    format!("(CONNECT_DATA=(COMMAND=status)(ARGUMENT=listener_password)(PASSWORD={password}))\x0a")
 }
 
 /// Read one TNS packet (header + body).
 async fn read_tns_packet(conn: &mut TcpConnection) -> Result<Vec<u8>, ZeusError> {
-    let header = conn.read_bytes(TNS_HDR_LEN).await
+    let header = conn
+        .read_bytes(TNS_HDR_LEN)
+        .await
         .map_err(|e| ZeusError::Protocol(format!("TNS: header read failed: {e}")))?;
     if header.len() < TNS_HDR_LEN {
         return Err(ZeusError::Protocol("TNS: header truncated".into()));
@@ -130,7 +130,8 @@ async fn read_tns_packet(conn: &mut TcpConnection) -> Result<Vec<u8>, ZeusError>
     }
     let body_len = total_len - TNS_HDR_LEN;
     let body = if body_len > 0 {
-        conn.read_bytes(body_len).await
+        conn.read_bytes(body_len)
+            .await
             .map_err(|e| ZeusError::Protocol(format!("TNS: body read failed: {e}")))?
     } else {
         vec![]
@@ -160,8 +161,12 @@ fn contains_description(data: &[u8]) -> bool {
 
 #[async_trait]
 impl Protocol for OracleListenerProtocol {
-    fn name(&self) -> &'static str { "oracle-listener" }
-    fn default_port(&self) -> u16 { 1521 }
+    fn name(&self) -> &'static str {
+        "oracle-listener"
+    }
+    fn default_port(&self) -> u16 {
+        1521
+    }
     fn description(&self) -> &'static str {
         "Oracle TNS Listener password authentication"
     }
@@ -181,14 +186,16 @@ impl Protocol for OracleListenerProtocol {
             .ok_or_else(|| ZeusError::Protocol("DNS resolution failed".into()))?;
 
         let start = Instant::now();
-        let mut conn = TcpConnection::connect(addr, config.timeout).await
+        let mut conn = TcpConnection::connect(addr, config.timeout)
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
 
         // ── Step 1: TNS CONNECT ────────────────────────────────────────────
         let desc = listener_connect_descriptor(&target.host, port);
         let connect_body = build_listener_connect_body(desc.as_bytes());
-        let connect_pkt  = tns_packet(TNS_TYPE_CONNECT, &connect_body);
-        conn.write_all(&connect_pkt).await
+        let connect_pkt = tns_packet(TNS_TYPE_CONNECT, &connect_body);
+        conn.write_all(&connect_pkt)
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
         debug!("OracleListener: sent TNS CONNECT");
 
@@ -196,7 +203,9 @@ impl Protocol for OracleListenerProtocol {
         let resp = read_tns_packet(&mut conn).await?;
         if resp.len() < TNS_HDR_LEN {
             let _ = conn.shutdown().await;
-            return Ok(AttackResult::Error("OracleListener: response too short".into()));
+            return Ok(AttackResult::Error(
+                "OracleListener: response too short".into(),
+            ));
         }
 
         let resp_type = resp[TNS_TYPE_OFFSET];
@@ -216,21 +225,28 @@ impl Protocol for OracleListenerProtocol {
             }
             other => {
                 let _ = conn.shutdown().await;
-                return Ok(AttackResult::Error(
-                    format!("OracleListener: unexpected response type {}", other),
-                ));
+                return Ok(AttackResult::Error(format!(
+                    "OracleListener: unexpected response type {}",
+                    other
+                )));
             }
         }
 
         // ── Step 3: send STATUS command (unauthenticated probe) ───────────
         let status_pkt = build_listener_data(listener_status_cmd());
-        conn.write_all(&status_pkt).await
+        conn.write_all(&status_pkt)
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
         debug!("OracleListener: sent STATUS command");
 
-        let status_resp = conn.read_available().await
+        let status_resp = conn
+            .read_available()
+            .await
             .map_err(|e| ZeusError::Protocol(format!("OracleListener: status read: {e}")))?;
-        debug!("OracleListener: STATUS response {} bytes", status_resp.len());
+        debug!(
+            "OracleListener: STATUS response {} bytes",
+            status_resp.len()
+        );
 
         // If no error 1189, listener is open — no password needed.
         if !contains_1189(&status_resp) {
@@ -250,10 +266,13 @@ impl Protocol for OracleListenerProtocol {
         // ── Step 4: STATUS with password ──────────────────────────────────
         let pwd_cmd = listener_status_with_password(&cred.password);
         let pwd_pkt = build_listener_data(pwd_cmd.as_bytes());
-        conn.write_all(&pwd_pkt).await
+        conn.write_all(&pwd_pkt)
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
 
-        let pwd_resp = conn.read_available().await
+        let pwd_resp = conn
+            .read_available()
+            .await
             .map_err(|e| ZeusError::Protocol(format!("OracleListener: pwd resp read: {e}")))?;
         let _ = conn.shutdown().await;
 

@@ -65,7 +65,9 @@ impl CsvWriter<io::BufWriter<std::fs::File>> {
             .write(true)
             .truncate(true)
             .open(path)?;
-        let mut w = Self { out: io::BufWriter::new(f) };
+        let mut w = Self {
+            out: io::BufWriter::new(f),
+        };
         w.write_header()?;
         Ok(w)
     }
@@ -90,12 +92,7 @@ impl<W: Write + Send + Sync> CsvWriter<W> {
     }
 
     fn write_row(&mut self, username: &str, password: &str, ts: u64) -> Result<(), OutputError> {
-        let row = format!(
-            "{},{},{}\n",
-            csv_escape(username),
-            csv_escape(password),
-            ts,
-        );
+        let row = format!("{},{},{}\n", csv_escape(username), csv_escape(password), ts,);
         self.out.write_all(row.as_bytes())?;
         Ok(())
     }
@@ -142,13 +139,18 @@ mod tests {
     fn output_contains_header() {
         let w = make_writer();
         let s = output(w);
-        assert!(s.starts_with("username,password,timestamp\n"), "bad header: {s}");
+        assert!(
+            s.starts_with("username,password,timestamp\n"),
+            "bad header: {s}"
+        );
     }
 
     #[tokio::test]
     async fn write_found_adds_row() {
         let mut w = make_writer();
-        w.write_found(&Credential::new("admin", "hunter2")).await.unwrap();
+        w.write_found(&Credential::new("admin", "hunter2"))
+            .await
+            .unwrap();
         let s = output(w);
         let lines: Vec<&str> = s.lines().collect();
         assert_eq!(lines.len(), 2, "expected header + 1 data row");
@@ -159,8 +161,12 @@ mod tests {
     #[tokio::test]
     async fn write_found_multiple_rows() {
         let mut w = make_writer();
-        w.write_found(&Credential::new("root", "toor")).await.unwrap();
-        w.write_found(&Credential::new("admin", "pass")).await.unwrap();
+        w.write_found(&Credential::new("root", "toor"))
+            .await
+            .unwrap();
+        w.write_found(&Credential::new("admin", "pass"))
+            .await
+            .unwrap();
         let s = output(w);
         assert_eq!(s.lines().count(), 3, "expected header + 2 rows");
     }
@@ -168,10 +174,16 @@ mod tests {
     #[tokio::test]
     async fn write_event_is_noop() {
         let mut w = make_writer();
-        w.write_event(&ProgressEvent::Warning("blah".to_string())).await.unwrap();
+        w.write_event(&ProgressEvent::Warning("blah".to_string()))
+            .await
+            .unwrap();
         let s = output(w);
         // Only the header line.
-        assert_eq!(s.lines().count(), 1, "events should be ignored by CsvWriter");
+        assert_eq!(
+            s.lines().count(),
+            1,
+            "events should be ignored by CsvWriter"
+        );
     }
 
     #[test]

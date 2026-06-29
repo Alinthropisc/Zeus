@@ -28,7 +28,7 @@
 use std::net::ToSocketAddrs;
 use std::time::Duration;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use tracing::debug;
 
 use crate::net::{TcpConnection, TlsConnection};
@@ -71,7 +71,14 @@ impl ConnectionConfig {
     pub async fn connect_tcp(&self) -> Result<TcpConnection> {
         let addr = format!("{}:{}", self.host, self.port)
             .to_socket_addrs()
-            .map_err(|e| anyhow!("DNS resolution failed for {}:{} — {}", self.host, self.port, e))?
+            .map_err(|e| {
+                anyhow!(
+                    "DNS resolution failed for {}:{} — {}",
+                    self.host,
+                    self.port,
+                    e
+                )
+            })?
             .next()
             .ok_or_else(|| anyhow!("no address resolved for {}:{}", self.host, self.port))?;
 

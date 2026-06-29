@@ -1,12 +1,12 @@
 //! TeamSpeak 2 TCP authentication, port 8767.
 
+use crate::net::TcpConnection;
 use async_trait::async_trait;
 use std::net::ToSocketAddrs;
 use std::sync::OnceLock;
 use std::time::Instant;
 use tracing::debug;
 use zeus_core::{AttackConfig, AttackResult, Credential, Protocol, Target, ZeusError};
-use crate::net::TcpConnection;
 
 pub struct TeamSpeakProtocol;
 
@@ -19,7 +19,11 @@ fn crc32(data: &[u8]) -> u32 {
         for i in 0..256 {
             let mut c = i as u32;
             for _ in 0..8 {
-                c = if c & 1 != 0 { 0xEDB8_8320 ^ (c >> 1) } else { c >> 1 };
+                c = if c & 1 != 0 {
+                    0xEDB8_8320 ^ (c >> 1)
+                } else {
+                    c >> 1
+                };
             }
             t[i] = c;
         }
@@ -111,9 +115,15 @@ fn build_ts2_packet(username: &str, password: &str) -> [u8; 180] {
 
 #[async_trait]
 impl Protocol for TeamSpeakProtocol {
-    fn name(&self) -> &'static str { "teamspeak" }
-    fn default_port(&self) -> u16 { 8767 }
-    fn description(&self) -> &'static str { "TeamSpeak 2 authentication" }
+    fn name(&self) -> &'static str {
+        "teamspeak"
+    }
+    fn default_port(&self) -> u16 {
+        8767
+    }
+    fn description(&self) -> &'static str {
+        "TeamSpeak 2 authentication"
+    }
 
     async fn authenticate(
         &self,
@@ -156,7 +166,10 @@ impl Protocol for TeamSpeakProtocol {
 
         // Success indicator at byte 2
         if resp[2] == 0x01 {
-            Ok(AttackResult::Success { credential: cred.clone(), elapsed: start.elapsed() })
+            Ok(AttackResult::Success {
+                credential: cred.clone(),
+                elapsed: start.elapsed(),
+            })
         } else {
             Ok(AttackResult::Failure)
         }

@@ -12,24 +12,24 @@
 //! Parameter Block) in plaintext.  For Firebird 3+ with SRP the `authenticate`
 //! method returns `AttackResult::Error` with an explanatory message.
 
+use crate::net::TcpConnection;
 use async_trait::async_trait;
 use std::net::ToSocketAddrs;
 use std::time::Instant;
 use tracing::debug;
 use zeus_core::{AttackConfig, AttackResult, Credential, Protocol, Target, ZeusError};
-use crate::net::TcpConnection;
 
 pub struct FirebirdProtocol;
 
 // ── Firebird opcodes ──────────────────────────────────────────────────────────
 
-const OP_CONNECT:   i32 = 1;
-const OP_DUMMY:     i32 = 0;
-const OP_ATTACH:    i32 = 23;
+const OP_CONNECT: i32 = 1;
+const OP_DUMMY: i32 = 0;
+const OP_ATTACH: i32 = 23;
 
-const OP_ACCEPT:    i32 = 3;
-const OP_REJECT:    i32 = 4;
-const OP_RESPONSE:  i32 = 9;
+const OP_ACCEPT: i32 = 3;
+const OP_REJECT: i32 = 4;
+const OP_RESPONSE: i32 = 9;
 // const OP_EXCEPTION: i32 = 8;  -- unused directly but noted for reference
 
 /// Architecture constant: "generic" / cross-platform
@@ -43,9 +43,9 @@ const PROTOCOL_V10: i32 = 10;
 
 // ── DPB (Database Parameter Block) constants ──────────────────────────────────
 
-const DPB_VERSION1:  u8 = 1;
+const DPB_VERSION1: u8 = 1;
 const DPB_USER_NAME: u8 = 28;
-const DPB_PASSWORD:  u8 = 29;
+const DPB_PASSWORD: u8 = 29;
 
 // ── XDR helpers ───────────────────────────────────────────────────────────────
 
@@ -64,8 +64,15 @@ fn xdr_string(buf: &mut Vec<u8>, data: &[u8]) {
 
 /// Read a big-endian i32 from `buf` at `pos`.  Returns `None` if out of bounds.
 fn read_i32(buf: &[u8], pos: usize) -> Option<i32> {
-    if pos + 4 > buf.len() { return None; }
-    Some(i32::from_be_bytes([buf[pos], buf[pos+1], buf[pos+2], buf[pos+3]]))
+    if pos + 4 > buf.len() {
+        return None;
+    }
+    Some(i32::from_be_bytes([
+        buf[pos],
+        buf[pos + 1],
+        buf[pos + 2],
+        buf[pos + 3],
+    ]))
 }
 
 // ── DPB builder ───────────────────────────────────────────────────────────────
@@ -94,19 +101,19 @@ fn build_op_connect(db_path: &[u8]) -> Vec<u8> {
     let mut pkt = Vec::new();
 
     xdr_i32(&mut pkt, OP_CONNECT);
-    xdr_i32(&mut pkt, OP_DUMMY);          // connect_operation (dummy op)
-    xdr_i32(&mut pkt, CONNECT_VERSION2);  // connect version
-    xdr_i32(&mut pkt, ARCH_GENERIC);      // client architecture
+    xdr_i32(&mut pkt, OP_DUMMY); // connect_operation (dummy op)
+    xdr_i32(&mut pkt, CONNECT_VERSION2); // connect version
+    xdr_i32(&mut pkt, ARCH_GENERIC); // client architecture
 
-    xdr_string(&mut pkt, db_path);        // database path (arbitrary for auth probe)
-    xdr_i32(&mut pkt, 1);                 // number of protocols offered
+    xdr_string(&mut pkt, db_path); // database path (arbitrary for auth probe)
+    xdr_i32(&mut pkt, 1); // number of protocols offered
 
     // Protocol descriptor: version, architecture, min_type, max_type, weight
-    xdr_i32(&mut pkt, PROTOCOL_V10);      // protocol version
-    xdr_i32(&mut pkt, ARCH_GENERIC);      // architecture
-    xdr_i32(&mut pkt, 0);                 // ptype_rpc (minimum type)
-    xdr_i32(&mut pkt, 3);                 // ptype_batch_send (maximum type)
-    xdr_i32(&mut pkt, 2);                 // weight (preference)
+    xdr_i32(&mut pkt, PROTOCOL_V10); // protocol version
+    xdr_i32(&mut pkt, ARCH_GENERIC); // architecture
+    xdr_i32(&mut pkt, 0); // ptype_rpc (minimum type)
+    xdr_i32(&mut pkt, 3); // ptype_batch_send (maximum type)
+    xdr_i32(&mut pkt, 2); // weight (preference)
 
     pkt
 }
@@ -118,9 +125,9 @@ fn build_op_attach(db_path: &[u8], dpb: &[u8]) -> Vec<u8> {
     let mut pkt = Vec::new();
 
     xdr_i32(&mut pkt, OP_ATTACH);
-    xdr_i32(&mut pkt, 0);                 // object handle (0 = new)
-    xdr_string(&mut pkt, db_path);        // database path
-    xdr_string(&mut pkt, dpb);            // DPB blob
+    xdr_i32(&mut pkt, 0); // object handle (0 = new)
+    xdr_string(&mut pkt, db_path); // database path
+    xdr_string(&mut pkt, dpb); // DPB blob
 
     pkt
 }
@@ -129,8 +136,12 @@ fn build_op_attach(db_path: &[u8], dpb: &[u8]) -> Vec<u8> {
 
 #[async_trait]
 impl Protocol for FirebirdProtocol {
-    fn name(&self) -> &'static str { "firebird" }
-    fn default_port(&self) -> u16 { 3050 }
+    fn name(&self) -> &'static str {
+        "firebird"
+    }
+    fn default_port(&self) -> u16 {
+        3050
+    }
     fn description(&self) -> &'static str {
         "Firebird DB legacy wire protocol (XDR, protocol v10 — targets Firebird ≤ 2.5)"
     }
@@ -149,7 +160,8 @@ impl Protocol for FirebirdProtocol {
             .ok_or_else(|| ZeusError::Protocol("DNS resolution failed".into()))?;
 
         let start = Instant::now();
-        let mut conn = TcpConnection::connect(addr, config.timeout).await
+        let mut conn = TcpConnection::connect(addr, config.timeout)
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
 
         // Database path: use the configured service name or a sensible default.
@@ -158,14 +170,17 @@ impl Protocol for FirebirdProtocol {
 
         // ── Step 1: op_connect ────────────────────────────────────────────
         let connect_pkt = build_op_connect(db_path);
-        conn.write_all(&connect_pkt).await
+        conn.write_all(&connect_pkt)
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
         debug!("Firebird: sent op_connect ({} bytes)", connect_pkt.len());
 
         // ── Step 2: read server response (op_accept or op_reject) ─────────
         // Minimum response is 4 bytes (opcode) + optional body.
         // op_accept body: version(4) arch(4) type(4) = 12 bytes → total 16
-        let accept_buf = conn.read_bytes(16).await
+        let accept_buf = conn
+            .read_bytes(16)
+            .await
             .map_err(|e| ZeusError::Protocol(format!("Firebird: no op_accept: {e}")))?;
 
         let server_opcode = match read_i32(&accept_buf, 0) {
@@ -180,7 +195,9 @@ impl Protocol for FirebirdProtocol {
         match server_opcode {
             op if op == OP_REJECT => {
                 let _ = conn.shutdown().await;
-                return Ok(AttackResult::Error("Firebird: server rejected protocol".into()));
+                return Ok(AttackResult::Error(
+                    "Firebird: server rejected protocol".into(),
+                ));
             }
             op if op != OP_ACCEPT => {
                 // Firebird 3+ sends a different opcode (op_cond_accept = 180) when
@@ -197,14 +214,17 @@ impl Protocol for FirebirdProtocol {
         // ── Step 3: op_attach with credentials ────────────────────────────
         let dpb = build_dpb(&cred.username, &cred.password);
         let attach_pkt = build_op_attach(db_path, &dpb);
-        conn.write_all(&attach_pkt).await
+        conn.write_all(&attach_pkt)
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
         debug!("Firebird: sent op_attach ({} bytes)", attach_pkt.len());
 
         // ── Step 4: read attach response ─────────────────────────────────
         // op_response(9): opcode(4) + handle(4) + blob_id(8) + status_vector_len(4) + ...
         // Minimum safe read: 4 bytes for the opcode.
-        let resp_buf = conn.read_available().await
+        let resp_buf = conn
+            .read_available()
+            .await
             .map_err(|e| ZeusError::Protocol(format!("Firebird: read error: {e}")))?;
         let _ = conn.shutdown().await;
 

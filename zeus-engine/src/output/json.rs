@@ -12,7 +12,7 @@
 use crate::output::{OutputError, OutputWriter};
 use async_trait::async_trait;
 use chrono::Utc;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::io::{self, Write};
 use std::path::Path;
 use std::time::Instant;
@@ -67,8 +67,8 @@ impl<W: Write + Send + Sync> JsonWriter<W> {
     }
 
     fn write_ndjson(&mut self, value: Value) -> Result<(), OutputError> {
-        let mut bytes = serde_json::to_vec(&value)
-            .map_err(|e| OutputError::Serialize(e.to_string()))?;
+        let mut bytes =
+            serde_json::to_vec(&value).map_err(|e| OutputError::Serialize(e.to_string()))?;
         bytes.push(b'\n');
         self.out.write_all(&bytes)?;
         Ok(())
@@ -89,7 +89,10 @@ impl<W: Write + Send + Sync> OutputWriter for JsonWriter<W> {
 
     async fn write_event(&mut self, event: &ProgressEvent) -> Result<(), OutputError> {
         match event {
-            ProgressEvent::SessionStarted { target, estimated_total } => {
+            ProgressEvent::SessionStarted {
+                target,
+                estimated_total,
+            } => {
                 let val = json!({
                     "type": "session_started",
                     "host": target.host,
@@ -110,7 +113,11 @@ impl<W: Write + Send + Sync> OutputWriter for JsonWriter<W> {
                 let val = json!({"type": "warning", "message": msg});
                 self.write_ndjson(val)?;
             }
-            ProgressEvent::Stats { attempts_per_sec, found, remaining } => {
+            ProgressEvent::Stats {
+                attempts_per_sec,
+                found,
+                remaining,
+            } => {
                 let val = json!({
                     "type": "stats",
                     "attempts_per_sec": attempts_per_sec,
@@ -133,8 +140,8 @@ impl<W: Write + Send + Sync> OutputWriter for JsonWriter<W> {
 
         // Write the credentials JSON array.
         let array = Value::Array(self.found.clone());
-        let array_bytes = serde_json::to_vec_pretty(&array)
-            .map_err(|e| OutputError::Serialize(e.to_string()))?;
+        let array_bytes =
+            serde_json::to_vec_pretty(&array).map_err(|e| OutputError::Serialize(e.to_string()))?;
         self.out.write_all(&array_bytes)?;
         self.out.write_all(b"\n")?;
 
@@ -145,8 +152,8 @@ impl<W: Write + Send + Sync> OutputWriter for JsonWriter<W> {
             "total_attempts": self.total_attempts,
             "elapsed_ms": elapsed_ms,
         });
-        let mut summary_bytes = serde_json::to_vec(&summary)
-            .map_err(|e| OutputError::Serialize(e.to_string()))?;
+        let mut summary_bytes =
+            serde_json::to_vec(&summary).map_err(|e| OutputError::Serialize(e.to_string()))?;
         summary_bytes.push(b'\n');
         self.out.write_all(&summary_bytes)?;
         self.out.flush()?;
@@ -165,23 +172,33 @@ mod tests {
     #[tokio::test]
     async fn write_found_buffered_not_flushed_yet() {
         let mut w = make_writer();
-        w.write_found(&Credential::new("admin", "secret")).await.unwrap();
+        w.write_found(&Credential::new("admin", "secret"))
+            .await
+            .unwrap();
         // Nothing written to the sink yet — only buffered.
-        assert!(w.out.is_empty(), "found creds should be buffered until close()");
+        assert!(
+            w.out.is_empty(),
+            "found creds should be buffered until close()"
+        );
         assert_eq!(w.found.len(), 1);
     }
 
     #[tokio::test]
     async fn close_writes_json_array_with_found_at() {
         let mut w = make_writer();
-        w.write_found(&Credential::new("root", "toor")).await.unwrap();
+        w.write_found(&Credential::new("root", "toor"))
+            .await
+            .unwrap();
         let raw = {
             let _boxed: Box<JsonWriter<Vec<u8>>> = Box::new(w);
             let buf_writer = {
                 // We can't recover the inner writer after close, so
                 // capture it via a shared buffer approach using the writer.
                 let mut inner = JsonWriter::new(Vec::new());
-                inner.write_found(&Credential::new("root", "toor")).await.unwrap();
+                inner
+                    .write_found(&Credential::new("root", "toor"))
+                    .await
+                    .unwrap();
                 inner
             };
             Box::new(buf_writer)
@@ -192,8 +209,12 @@ mod tests {
     #[tokio::test]
     async fn close_produces_valid_json_array() {
         let mut w = JsonWriter::new(Vec::new());
-        w.write_found(&Credential::new("admin", "pass")).await.unwrap();
-        w.write_found(&Credential::new("root", "toor")).await.unwrap();
+        w.write_found(&Credential::new("admin", "pass"))
+            .await
+            .unwrap();
+        w.write_found(&Credential::new("root", "toor"))
+            .await
+            .unwrap();
         let sink = {
             // Capture the inner buffer after close by using separate writer.
             let mut inner: JsonWriter<Vec<u8>> = JsonWriter::new(Vec::new());

@@ -4,13 +4,13 @@
 //! `DeviceHttpClient`, `SsrfHttpClient`, and `UebaHttpClient`, eliminating
 //! the need for five separate client newtypes in the calling code.
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use std::time::Duration;
 use tracing::debug;
 
 use zeus_core::probe::jwt_probe::JwtHttpClient;
-use zeus_core::probe::saml_probe::SamlHttpClient;
 use zeus_core::probe::oauth_device_probe::DeviceHttpClient;
+use zeus_core::probe::saml_probe::SamlHttpClient;
 use zeus_core::probe::ssrf_probe::SsrfHttpClient;
 use zeus_core::probe::ueba_probe::UebaHttpClient;
 

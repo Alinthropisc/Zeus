@@ -14,7 +14,9 @@ pub struct TargetList {
 impl TargetList {
     /// Create an empty list.
     pub fn new() -> Self {
-        Self { targets: Vec::new() }
+        Self {
+            targets: Vec::new(),
+        }
     }
 
     /// Add a target to the list.
@@ -97,16 +99,19 @@ impl TargetList {
     pub fn expand_cidr(cidr: &str, port: u16, protocol: &str) -> Result<Vec<Target>, ZeusError> {
         let parts: Vec<&str> = cidr.split('/').collect();
         if parts.len() != 2 {
-            return Err(ZeusError::Config(format!("invalid CIDR notation: '{}'", cidr)));
+            return Err(ZeusError::Config(format!(
+                "invalid CIDR notation: '{}'",
+                cidr
+            )));
         }
 
-        let ip: std::net::Ipv4Addr = parts[0]
-            .parse()
-            .map_err(|_| ZeusError::Config(format!("invalid IP address in CIDR: '{}'", parts[0])))?;
+        let ip: std::net::Ipv4Addr = parts[0].parse().map_err(|_| {
+            ZeusError::Config(format!("invalid IP address in CIDR: '{}'", parts[0]))
+        })?;
 
-        let prefix: u8 = parts[1]
-            .parse()
-            .map_err(|_| ZeusError::Config(format!("invalid prefix length in CIDR: '{}'", parts[1])))?;
+        let prefix: u8 = parts[1].parse().map_err(|_| {
+            ZeusError::Config(format!("invalid prefix length in CIDR: '{}'", parts[1]))
+        })?;
 
         if prefix > 32 {
             return Err(ZeusError::Config(format!("prefix length {} > 32", prefix)));
@@ -114,7 +119,11 @@ impl TargetList {
 
         let host_bits = 32 - prefix as u32;
         let count = 1u32 << host_bits;
-        let mask: u32 = if prefix == 0 { 0 } else { !((1u32 << host_bits) - 1) };
+        let mask: u32 = if prefix == 0 {
+            0
+        } else {
+            !((1u32 << host_bits) - 1)
+        };
         let network = u32::from(ip) & mask;
 
         // /32 — single host, no network/broadcast to strip

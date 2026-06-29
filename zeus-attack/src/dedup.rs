@@ -1,6 +1,6 @@
 use crate::{AttackStrategy, CredentialStream};
-use std::collections::HashSet;
 use futures::StreamExt;
+use std::collections::HashSet;
 
 /// Decorator — wraps any `AttackStrategy` and filters out duplicate passwords.
 ///
@@ -23,7 +23,9 @@ impl DeduplicateStrategy {
 }
 
 impl AttackStrategy for DeduplicateStrategy {
-    fn name(&self) -> &'static str { "dedup" }
+    fn name(&self) -> &'static str {
+        "dedup"
+    }
 
     fn credentials(&self) -> CredentialStream {
         let mut seen: HashSet<String> = HashSet::new();
@@ -56,9 +58,15 @@ mod tests {
     struct FixedStrategy(Vec<Credential>);
 
     impl AttackStrategy for FixedStrategy {
-        fn name(&self) -> &'static str { "fixed" }
-        fn credentials(&self) -> CredentialStream { Box::pin(iter(self.0.clone())) }
-        fn estimated_count(&self) -> Option<u64> { Some(self.0.len() as u64) }
+        fn name(&self) -> &'static str {
+            "fixed"
+        }
+        fn credentials(&self) -> CredentialStream {
+            Box::pin(iter(self.0.clone()))
+        }
+        fn estimated_count(&self) -> Option<u64> {
+            Some(self.0.len() as u64)
+        }
     }
 
     fn cred(user: &str, pass: &str) -> Credential {
@@ -98,7 +106,13 @@ mod tests {
         ]));
         let s = DeduplicateStrategy::new(inner);
         let creds = collect_sync(&s);
-        assert_eq!(creds.iter().map(|c| c.password.as_str()).collect::<Vec<_>>(), vec!["z", "a", "m"]);
+        assert_eq!(
+            creds
+                .iter()
+                .map(|c| c.password.as_str())
+                .collect::<Vec<_>>(),
+            vec!["z", "a", "m"]
+        );
     }
 
     #[test]

@@ -25,8 +25,8 @@
 //! | `url` | `http://example.com/`  | Target URL to tunnel through   |
 
 use async_trait::async_trait;
-use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
+use base64::engine::general_purpose::STANDARD as BASE64;
 use reqwest::{Client, StatusCode};
 use std::time::{Duration, Instant};
 use tracing::debug;
@@ -60,8 +60,12 @@ impl Default for HttpProxyUrlEnumProtocol {
 
 #[async_trait]
 impl Protocol for HttpProxyUrlEnumProtocol {
-    fn name(&self) -> &'static str { "http-proxy-urlenum" }
-    fn default_port(&self) -> u16 { 3128 }
+    fn name(&self) -> &'static str {
+        "http-proxy-urlenum"
+    }
+    fn default_port(&self) -> u16 {
+        3128
+    }
     fn description(&self) -> &'static str {
         "HTTP proxy URL enumeration with authentication"
     }

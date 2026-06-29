@@ -14,13 +14,13 @@
 //!      - SNAC (0x0017, 0x0003) with TLV 0x0005 (BOS address) → success.
 //!      - SNAC (0x0017, 0x0003) with TLV 0x0008 (error code) → failure.
 
+use crate::net::TcpConnection;
 use async_trait::async_trait;
 use md5::{Digest, Md5};
 use std::net::ToSocketAddrs;
 use std::time::Instant;
 use tracing::debug;
 use zeus_core::{AttackConfig, AttackResult, Credential, Protocol, Target, ZeusError};
-use crate::net::TcpConnection;
 
 // ── FLAP / SNAC framing ───────────────────────────────────────────────────────
 
@@ -81,9 +81,15 @@ pub struct IcqProtocol;
 
 #[async_trait]
 impl Protocol for IcqProtocol {
-    fn name(&self) -> &'static str { "icq" }
-    fn default_port(&self) -> u16 { 5190 }
-    fn description(&self) -> &'static str { "ICQ/OSCAR legacy authentication" }
+    fn name(&self) -> &'static str {
+        "icq"
+    }
+    fn default_port(&self) -> u16 {
+        5190
+    }
+    fn description(&self) -> &'static str {
+        "ICQ/OSCAR legacy authentication"
+    }
 
     async fn authenticate(
         &self,
@@ -200,7 +206,9 @@ fn extract_tlv(data: &[u8], target_type: u16) -> Option<Vec<u8>> {
         let t = u16::from_be_bytes([data[i], data[i + 1]]);
         let l = u16::from_be_bytes([data[i + 2], data[i + 3]]) as usize;
         i += 4;
-        if i + l > data.len() { break; }
+        if i + l > data.len() {
+            break;
+        }
         if t == target_type {
             return Some(data[i..i + l].to_vec());
         }
@@ -223,8 +231,8 @@ mod tests {
     fn flap_packet_header() {
         let data = b"hello";
         let pkt = build_flap(0x01, 0x0042, data);
-        assert_eq!(pkt[0], 0x2a);           // FLAP marker
-        assert_eq!(pkt[1], 0x01);           // channel
+        assert_eq!(pkt[0], 0x2a); // FLAP marker
+        assert_eq!(pkt[1], 0x01); // channel
         assert_eq!(&pkt[2..4], &[0x00, 0x42]); // sequence BE
         assert_eq!(&pkt[4..6], &[0x00, 0x05]); // length BE
         assert_eq!(&pkt[6..], b"hello");
@@ -244,7 +252,7 @@ mod tests {
     fn extract_tlv_finds_value() {
         let mut stream = Vec::new();
         stream.extend_from_slice(&[0x00, 0x01, 0x00, 0x03, b'f', b'o', b'o']); // TLV 1
-        stream.extend_from_slice(&[0x00, 0x05, 0x00, 0x02, 0xAA, 0xBB]);        // TLV 5
+        stream.extend_from_slice(&[0x00, 0x05, 0x00, 0x02, 0xAA, 0xBB]); // TLV 5
         assert_eq!(extract_tlv(&stream, 0x0005), Some(vec![0xAA, 0xBB]));
         assert!(extract_tlv(&stream, 0x0009).is_none());
     }

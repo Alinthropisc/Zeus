@@ -1,17 +1,23 @@
+use crate::net::TcpConnection;
 use async_trait::async_trait;
 use std::net::ToSocketAddrs;
 use std::time::Instant;
 use tracing::debug;
 use zeus_core::{AttackConfig, AttackResult, Credential, Protocol, Target, ZeusError};
-use crate::net::TcpConnection;
 
 pub struct Pop3Protocol;
 
 #[async_trait]
 impl Protocol for Pop3Protocol {
-    fn name(&self) -> &'static str { "pop3" }
-    fn default_port(&self) -> u16 { 110 }
-    fn description(&self) -> &'static str { "POP3 USER/PASS authentication" }
+    fn name(&self) -> &'static str {
+        "pop3"
+    }
+    fn default_port(&self) -> u16 {
+        110
+    }
+    fn description(&self) -> &'static str {
+        "POP3 USER/PASS authentication"
+    }
 
     async fn authenticate(
         &self,
@@ -20,15 +26,21 @@ impl Protocol for Pop3Protocol {
         config: &AttackConfig,
     ) -> Result<AttackResult, ZeusError> {
         let addr_str = format!("{}:{}", target.host, target.port);
-        let addr = addr_str.to_socket_addrs().map_err(ZeusError::Network)?
-            .next().ok_or_else(|| ZeusError::Protocol("DNS failed".into()))?;
+        let addr = addr_str
+            .to_socket_addrs()
+            .map_err(ZeusError::Network)?
+            .next()
+            .ok_or_else(|| ZeusError::Protocol("DNS failed".into()))?;
 
         let start = Instant::now();
-        let mut conn = TcpConnection::connect(addr, config.timeout).await
+        let mut conn = TcpConnection::connect(addr, config.timeout)
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
 
         // Read greeting "+OK ..."
-        let greeting = conn.read_until_crlf().await
+        let greeting = conn
+            .read_until_crlf()
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
         let greeting_str = String::from_utf8_lossy(&greeting);
         debug!("POP3 greeting: {:?}", greeting_str);
@@ -39,9 +51,12 @@ impl Protocol for Pop3Protocol {
         }
 
         // USER command
-        conn.write_all(format!("USER {}\r\n", cred.username).as_bytes()).await
+        conn.write_all(format!("USER {}\r\n", cred.username).as_bytes())
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
-        let user_resp = conn.read_until_crlf().await
+        let user_resp = conn
+            .read_until_crlf()
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
         let user_str = String::from_utf8_lossy(&user_resp);
         debug!("POP3 USER resp: {:?}", user_str);
@@ -52,9 +67,12 @@ impl Protocol for Pop3Protocol {
         }
 
         // PASS command
-        conn.write_all(format!("PASS {}\r\n", cred.password).as_bytes()).await
+        conn.write_all(format!("PASS {}\r\n", cred.password).as_bytes())
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
-        let pass_resp = conn.read_until_crlf().await
+        let pass_resp = conn
+            .read_until_crlf()
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
         let pass_str = String::from_utf8_lossy(&pass_resp);
         debug!("POP3 PASS resp: {:?}", pass_str);
@@ -64,7 +82,10 @@ impl Protocol for Pop3Protocol {
         let _ = conn.shutdown().await;
 
         if pass_str.starts_with("+OK") {
-            Ok(AttackResult::Success { credential: cred.clone(), elapsed: start.elapsed() })
+            Ok(AttackResult::Success {
+                credential: cred.clone(),
+                elapsed: start.elapsed(),
+            })
         } else if pass_str.contains("-ERR") && pass_str.to_lowercase().contains("lock") {
             Ok(AttackResult::Error("Mailbox locked".into()))
         } else {

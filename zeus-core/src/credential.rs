@@ -9,7 +9,10 @@ pub struct Credential {
 
 impl Credential {
     pub fn new(username: impl Into<String>, password: impl Into<String>) -> Self {
-        Self { username: username.into(), password: password.into() }
+        Self {
+            username: username.into(),
+            password: password.into(),
+        }
     }
 
     pub fn from_colon_str(s: &str) -> Option<Self> {

@@ -10,12 +10,12 @@
 //!      - RPCAP_MSG_AUTH_REPLY (0x09) → credentials accepted.
 //!      - RPCAP_MSG_ERROR      (0xFE) → credentials rejected.
 
+use crate::net::TcpConnection;
 use async_trait::async_trait;
 use std::net::ToSocketAddrs;
 use std::time::Instant;
 use tracing::debug;
 use zeus_core::{AttackConfig, AttackResult, Credential, Protocol, Target, ZeusError};
-use crate::net::TcpConnection;
 
 // ── RPCAP constants ───────────────────────────────────────────────────────────
 
@@ -65,8 +65,12 @@ pub struct RpcapProtocol;
 
 #[async_trait]
 impl Protocol for RpcapProtocol {
-    fn name(&self) -> &'static str { "rpcap" }
-    fn default_port(&self) -> u16 { 2002 }
+    fn name(&self) -> &'static str {
+        "rpcap"
+    }
+    fn default_port(&self) -> u16 {
+        2002
+    }
     fn description(&self) -> &'static str {
         "WinPcap/Npcap Remote Capture Protocol (RPCAP) password authentication"
     }

@@ -47,8 +47,9 @@ impl DispatchStrategy for SequentialStrategy {
         cursor: usize,
         concurrency: usize,
     ) -> Vec<Credential> {
+        let start = cursor.min(credentials.len());
         let end = credentials.len().min(cursor + concurrency);
-        credentials[cursor..end].to_vec()
+        credentials[start..end].to_vec()
     }
 
     fn should_stop(&self, _result: &AttackResult, _config: &AttackConfig) -> bool {
@@ -95,7 +96,9 @@ mod tests {
     }
 
     fn creds(n: usize) -> Vec<Credential> {
-        (0..n).map(|i| cred(&format!("u{i}"), &format!("p{i}"))).collect()
+        (0..n)
+            .map(|i| cred(&format!("u{i}"), &format!("p{i}")))
+            .collect()
     }
 
     fn success() -> AttackResult {

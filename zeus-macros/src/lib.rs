@@ -14,9 +14,9 @@ use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 use syn::{
+    DeriveInput, Ident, LitBool, LitInt, LitStr, Token,
     parse::{Parse, ParseStream},
     parse_macro_input,
-    DeriveInput, Ident, LitBool, LitInt, LitStr, Token,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -45,7 +45,8 @@ fn camel_to_snake(s: &str) -> String {
     let chars: Vec<char> = s.chars().collect();
 
     for (i, &ch) in chars.iter().enumerate() {
-        let prev_is_lower_or_digit = i > 0 && (chars[i - 1].is_lowercase() || chars[i - 1].is_ascii_digit());
+        let prev_is_lower_or_digit =
+            i > 0 && (chars[i - 1].is_lowercase() || chars[i - 1].is_ascii_digit());
         if ch.is_uppercase() && prev_is_lower_or_digit {
             result.push('_');
         }
@@ -123,7 +124,12 @@ impl Parse for ProtocolArgs {
     ///
     /// Recognised keys: `name`, `port`, `tls`, `desc`.
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let mut args = ProtocolArgs { name: None, port: None, tls: None, desc: None };
+        let mut args = ProtocolArgs {
+            name: None,
+            port: None,
+            tls: None,
+            desc: None,
+        };
 
         while !input.is_empty() {
             let key: Ident = input.parse()?;
@@ -149,7 +155,10 @@ impl Parse for ProtocolArgs {
                 other => {
                     return Err(syn::Error::new(
                         key.span(),
-                        format!("unknown zeus_protocol argument `{}`; expected name, port, tls, or desc", other),
+                        format!(
+                            "unknown zeus_protocol argument `{}`; expected name, port, tls, or desc",
+                            other
+                        ),
                     ));
                 }
             }

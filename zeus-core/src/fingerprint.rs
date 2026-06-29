@@ -127,8 +127,15 @@ impl ResponseFingerprint {
         let sim = self.similarity(baseline_failure);
         sim < 0.6
             || self.keywords_found.iter().any(|k| {
-                ["welcome", "logout", "dashboard", "profile", "signed in", "logged in"]
-                    .contains(&k.as_str())
+                [
+                    "welcome",
+                    "logout",
+                    "dashboard",
+                    "profile",
+                    "signed in",
+                    "logged in",
+                ]
+                .contains(&k.as_str())
             })
     }
 
@@ -205,8 +212,8 @@ impl BaselineCollector {
         let avg_status = self.samples[0].status_code;
         let avg_len =
             self.samples.iter().map(|s| s.body_length).sum::<usize>() / self.samples.len();
-        let avg_time =
-            self.samples.iter().map(|s| s.response_time_ms).sum::<f64>() / self.samples.len() as f64;
+        let avg_time = self.samples.iter().map(|s| s.response_time_ms).sum::<f64>()
+            / self.samples.len() as f64;
         let redirect = self.samples[0].redirect_location.clone();
         let headers = self.samples[0].headers.clone();
 
@@ -269,7 +276,10 @@ mod tests {
         let sim = fp.similarity(&baseline);
         // Status matches (+3) but body length ratio = 20x → no length points; redirect both None (+2)
         // 5/7 ≈ 0.714 — strictly less than 1.0
-        assert!(sim < 1.0, "very different body length should reduce similarity, got {sim}");
+        assert!(
+            sim < 1.0,
+            "very different body length should reduce similarity, got {sim}"
+        );
     }
 
     // ── keyword extraction ────────────────────────────────────────────────────
@@ -381,7 +391,10 @@ mod tests {
         col.add_sample(fp3);
 
         let baseline = col.baseline().expect("baseline should be available");
-        assert_eq!(baseline.body_length, 200, "average of 100/200/300 should be 200");
+        assert_eq!(
+            baseline.body_length, 200,
+            "average of 100/200/300 should be 200"
+        );
     }
 
     #[test]

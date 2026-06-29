@@ -15,12 +15,12 @@
 //!    to confirm the server speaks DIAG, then return a descriptive error
 //!    explaining that full credential testing requires `librfc`.
 
+use crate::net::{HttpClient, TcpConnection};
 use async_trait::async_trait;
 use std::net::ToSocketAddrs;
 use std::time::Instant;
 use tracing::debug;
 use zeus_core::{AttackConfig, AttackResult, Credential, Protocol, Target, ZeusError};
-use crate::net::{HttpClient, TcpConnection};
 
 // ── SAP DIAG constants ────────────────────────────────────────────────────────
 
@@ -33,9 +33,9 @@ use crate::net::{HttpClient, TcpConnection};
 /// This is enough to elicit a DIAG banner from a genuine SAP application server.
 const SAP_NI_PROBE: &[u8] = &[
     0x00, 0x00, 0x00, 0x08, // NI length = 8
-    0x02,                   // NI protocol version
-    0xFF,                   // DPMON type
-    0x00, 0x00,             // padding
+    0x02, // NI protocol version
+    0xFF, // DPMON type
+    0x00, 0x00, // padding
 ];
 
 // ── HTTP path ─────────────────────────────────────────────────────────────────
@@ -96,10 +96,7 @@ async fn try_http(
 
 // ── DIAG path ─────────────────────────────────────────────────────────────────
 
-async fn try_diag(
-    target: &Target,
-    config: &AttackConfig,
-) -> Result<AttackResult, ZeusError> {
+async fn try_diag(target: &Target, config: &AttackConfig) -> Result<AttackResult, ZeusError> {
     let addr = format!("{}:{}", target.host, target.port)
         .to_socket_addrs()
         .map_err(ZeusError::Network)?
@@ -114,7 +111,10 @@ async fn try_diag(
         .await
         .map_err(|e| ZeusError::Protocol(e.to_string()))?;
 
-    debug!("SAP R/3 DIAG: sent NI probe to {}:{}", target.host, target.port);
+    debug!(
+        "SAP R/3 DIAG: sent NI probe to {}:{}",
+        target.host, target.port
+    );
 
     let resp = conn
         .read_until_crlf()
@@ -145,8 +145,12 @@ pub struct SapR3Protocol;
 
 #[async_trait]
 impl Protocol for SapR3Protocol {
-    fn name(&self) -> &'static str { "sapr3" }
-    fn default_port(&self) -> u16 { 3200 }
+    fn name(&self) -> &'static str {
+        "sapr3"
+    }
+    fn default_port(&self) -> u16 {
+        3200
+    }
     fn description(&self) -> &'static str {
         "SAP R/3 DIAG protocol authentication (partial — use port 8080 for HTTP interface)"
     }

@@ -22,14 +22,22 @@ impl HttpProxyProtocol {
 }
 
 impl Default for HttpProxyProtocol {
-    fn default() -> Self { Self::new().expect("HTTP proxy client") }
+    fn default() -> Self {
+        Self::new().expect("HTTP proxy client")
+    }
 }
 
 #[async_trait]
 impl Protocol for HttpProxyProtocol {
-    fn name(&self) -> &'static str { "http-proxy" }
-    fn default_port(&self) -> u16 { 3128 }
-    fn description(&self) -> &'static str { "HTTP proxy Basic authentication" }
+    fn name(&self) -> &'static str {
+        "http-proxy"
+    }
+    fn default_port(&self) -> u16 {
+        3128
+    }
+    fn description(&self) -> &'static str {
+        "HTTP proxy Basic authentication"
+    }
 
     async fn authenticate(
         &self,
@@ -42,7 +50,9 @@ impl Protocol for HttpProxyProtocol {
         let auth = format!("Basic {}", BASE64.encode(credentials.as_bytes()));
 
         // Try to CONNECT through the proxy with Proxy-Authorization header
-        let test_url = target.options.get("test_url")
+        let test_url = target
+            .options
+            .get("test_url")
             .map(String::as_str)
             .unwrap_or("http://www.google.com");
 
@@ -68,7 +78,10 @@ impl Protocol for HttpProxyProtocol {
         } else if status == StatusCode::FORBIDDEN {
             Ok(AttackResult::Failure)
         } else {
-            Ok(AttackResult::Success { credential: cred.clone(), elapsed: start.elapsed() })
+            Ok(AttackResult::Success {
+                credential: cred.clone(),
+                elapsed: start.elapsed(),
+            })
         }
     }
 }

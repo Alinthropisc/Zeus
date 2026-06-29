@@ -12,18 +12,13 @@ use futures::StreamExt;
 use zeus_core::Credential;
 
 /// The combination order for hybrid attacks.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum HybridMode {
     /// word + mask permutation (default, most common)
+    #[default]
     WordAndMask,
     /// mask permutation + word
     MaskAndWord,
-}
-
-impl Default for HybridMode {
-    fn default() -> Self {
-        Self::WordAndMask
-    }
 }
 
 /// Generate all strings described by a mask.
@@ -134,7 +129,9 @@ impl HybridStrategy {
 }
 
 impl AttackStrategy for HybridStrategy {
-    fn name(&self) -> &'static str { "hybrid" }
+    fn name(&self) -> &'static str {
+        "hybrid"
+    }
 
     fn credentials(&self) -> CredentialStream {
         // Expand the mask once; mask combos are typically small enough (e.g. ?d?d?d = 1000).
@@ -232,8 +229,7 @@ mod tests {
 
     #[test]
     fn estimated_count_mask_and_word() {
-        let s = HybridStrategy::new(wl(&["x", "y"]), "?l")
-            .with_mode(HybridMode::MaskAndWord);
+        let s = HybridStrategy::new(wl(&["x", "y"]), "?l").with_mode(HybridMode::MaskAndWord);
         // 2 words * 26 alpha combos * 1 user = 52
         assert_eq!(s.estimated_count(), Some(52));
     }
@@ -249,8 +245,7 @@ mod tests {
 
     #[test]
     fn mask_and_word_prefixes_mask() {
-        let s = HybridStrategy::new(wl(&["word"]), "?d")
-            .with_mode(HybridMode::MaskAndWord);
+        let s = HybridStrategy::new(wl(&["word"]), "?d").with_mode(HybridMode::MaskAndWord);
         let creds = collect_sync(&s);
         assert_eq!(creds.len(), 10);
         assert!(creds.iter().all(|c| c.password.ends_with("word")));

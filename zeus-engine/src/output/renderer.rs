@@ -3,8 +3,8 @@
 //! Each `*Renderer` implements [`ReportRenderer`] and produces a different
 //! textual representation of the same report data.
 
-use crate::output::builder::Report;
 use crate::output::OutputError;
+use crate::output::builder::Report;
 use std::fmt;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -26,8 +26,7 @@ pub struct JsonRenderer;
 
 impl ReportRenderer for JsonRenderer {
     fn render(&self, report: &Report) -> Result<String, OutputError> {
-        serde_json::to_string_pretty(report)
-            .map_err(|e| OutputError::Serialize(e.to_string()))
+        serde_json::to_string_pretty(report).map_err(|e| OutputError::Serialize(e.to_string()))
     }
 }
 
@@ -43,9 +42,7 @@ pub struct CsvRenderer;
 
 impl ReportRenderer for CsvRenderer {
     fn render(&self, report: &Report) -> Result<String, OutputError> {
-        let mut out = String::from(
-            "id,title,severity,category,cvss_score,remediation,timestamp\n",
-        );
+        let mut out = String::from("id,title,severity,category,cvss_score,remediation,timestamp\n");
 
         for f in &report.findings {
             // Escape double-quotes in free-text fields.
@@ -94,8 +91,7 @@ impl ReportRenderer for NucleiRenderer {
             });
 
             lines.push(
-                serde_json::to_string(&obj)
-                    .map_err(|e| OutputError::Serialize(e.to_string()))?,
+                serde_json::to_string(&obj).map_err(|e| OutputError::Serialize(e.to_string()))?,
             );
         }
 
@@ -142,10 +138,10 @@ impl HtmlRenderer {
         use crate::output::finding::Severity;
         match severity {
             Severity::Critical => "#dc2626",
-            Severity::High     => "#ea580c",
-            Severity::Medium   => "#ca8a04",
-            Severity::Low      => "#2563eb",
-            Severity::Info     => "#6b7280",
+            Severity::High => "#ea580c",
+            Severity::Medium => "#ca8a04",
+            Severity::Low => "#2563eb",
+            Severity::Info => "#6b7280",
         }
     }
 
@@ -155,11 +151,12 @@ impl HtmlRenderer {
         format!(r#"<span class="badge badge-{css_class}">{label}</span>"#)
     }
 
-    fn count_by_severity(
-        report: &Report,
-        target: &crate::output::finding::Severity,
-    ) -> usize {
-        report.findings.iter().filter(|f| &f.severity == target).count()
+    fn count_by_severity(report: &Report, target: &crate::output::finding::Severity) -> usize {
+        report
+            .findings
+            .iter()
+            .filter(|f| &f.severity == target)
+            .count()
     }
 }
 
@@ -171,16 +168,16 @@ impl ReportRenderer for HtmlRenderer {
 
         // ── severity summary counts ──
         let critical = Self::count_by_severity(report, &Severity::Critical);
-        let high     = Self::count_by_severity(report, &Severity::High);
-        let medium   = Self::count_by_severity(report, &Severity::Medium);
-        let low      = Self::count_by_severity(report, &Severity::Low);
-        let info     = Self::count_by_severity(report, &Severity::Info);
+        let high = Self::count_by_severity(report, &Severity::High);
+        let medium = Self::count_by_severity(report, &Severity::Medium);
+        let low = Self::count_by_severity(report, &Severity::Low);
+        let info = Self::count_by_severity(report, &Severity::Info);
 
         // ── findings table rows ──
         let mut findings_rows = String::new();
         for f in &report.findings {
-            let badge   = Self::severity_badge(&f.severity);
-            let ts      = f.timestamp.format("%Y-%m-%d %H:%M:%S");
+            let badge = Self::severity_badge(&f.severity);
+            let ts = f.timestamp.format("%Y-%m-%d %H:%M:%S");
             let id_short = f.id.to_string().chars().take(8).collect::<String>();
 
             findings_rows.push_str(&format!(
@@ -193,14 +190,14 @@ impl ReportRenderer for HtmlRenderer {
   <td>{remediation}</td>
   <td class="mono ts">{ts}</td>
 </tr>"#,
-                id_short    = id_short,
-                title       = html_escape(&f.title),
-                badge       = badge,
-                category    = html_escape(&f.category.to_string()),
-                color       = Self::severity_color(&f.severity),
-                cvss        = f.cvss_score,
+                id_short = id_short,
+                title = html_escape(&f.title),
+                badge = badge,
+                category = html_escape(&f.category.to_string()),
+                color = Self::severity_color(&f.severity),
+                cvss = f.cvss_score,
                 remediation = html_escape(&f.remediation),
-                ts          = ts,
+                ts = ts,
             ));
         }
 
@@ -210,14 +207,14 @@ impl ReportRenderer for HtmlRenderer {
             let ts = event.timestamp.format("%H:%M:%S");
             timeline_rows.push_str(&format!(
                 r#"<li><span class="ts">[{ts}]</span> <strong>{etype}</strong> — {detail}</li>"#,
-                ts     = ts,
-                etype  = html_escape(&event.event_type.to_string()),
+                ts = ts,
+                etype = html_escape(&event.event_type.to_string()),
                 detail = html_escape(&event.detail),
             ));
         }
 
         let html = format!(
-r#"<!DOCTYPE html>
+            r#"<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -297,17 +294,17 @@ r#"<!DOCTYPE html>
 
 </body>
 </html>"#,
-            title          = html_escape(&report.metadata.title),
-            target         = html_escape(&report.metadata.target),
-            generated_at   = generated_at,
-            total          = report.findings.len(),
-            critical       = critical,
-            high           = high,
-            medium         = medium,
-            low            = low,
-            info           = info,
-            findings_rows  = findings_rows,
-            timeline_rows  = timeline_rows,
+            title = html_escape(&report.metadata.title),
+            target = html_escape(&report.metadata.target),
+            generated_at = generated_at,
+            total = report.findings.len(),
+            critical = critical,
+            high = high,
+            medium = medium,
+            low = low,
+            info = info,
+            findings_rows = findings_rows,
+            timeline_rows = timeline_rows,
         );
 
         Ok(html)
@@ -317,10 +314,10 @@ r#"<!DOCTYPE html>
 /// Escape the five XML/HTML special characters.
 fn html_escape(s: &str) -> String {
     s.replace('&', "&amp;")
-     .replace('<', "&lt;")
-     .replace('>', "&gt;")
-     .replace('"', "&quot;")
-     .replace('\'', "&#39;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&#39;")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -355,7 +352,10 @@ mod tests {
         let report = sample_report();
         let html = HtmlRenderer.render(&report).unwrap();
         assert!(html.contains("<table>"), "expected <table> tag");
-        assert!(html.contains("Default SSH Credentials Found"), "expected finding title");
+        assert!(
+            html.contains("Default SSH Credentials Found"),
+            "expected finding title"
+        );
     }
 
     #[test]

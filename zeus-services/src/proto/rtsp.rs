@@ -19,14 +19,22 @@ impl RtspProtocol {
 }
 
 impl Default for RtspProtocol {
-    fn default() -> Self { Self::new().expect("RTSP client") }
+    fn default() -> Self {
+        Self::new().expect("RTSP client")
+    }
 }
 
 #[async_trait]
 impl Protocol for RtspProtocol {
-    fn name(&self) -> &'static str { "rtsp" }
-    fn default_port(&self) -> u16 { 554 }
-    fn description(&self) -> &'static str { "RTSP Basic/Digest authentication (IP cameras)" }
+    fn name(&self) -> &'static str {
+        "rtsp"
+    }
+    fn default_port(&self) -> u16 {
+        554
+    }
+    fn description(&self) -> &'static str {
+        "RTSP Basic/Digest authentication (IP cameras)"
+    }
 
     async fn authenticate(
         &self,
@@ -59,7 +67,10 @@ impl Protocol for RtspProtocol {
                 let status = r.status();
                 debug!("RTSP resp: {}", status);
                 if status.is_success() {
-                    Ok(AttackResult::Success { credential: cred.clone(), elapsed: start.elapsed() })
+                    Ok(AttackResult::Success {
+                        credential: cred.clone(),
+                        elapsed: start.elapsed(),
+                    })
                 } else {
                     Ok(AttackResult::Failure)
                 }

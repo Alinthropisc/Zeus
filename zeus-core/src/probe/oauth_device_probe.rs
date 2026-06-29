@@ -3,7 +3,7 @@
 //! Fluent Builder pattern: [`OAuthDeviceFlowBuilder`] constructs an
 //! [`OAuthDeviceProbe`] step by step.
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use thiserror::Error;
 
 use crate::probe::jwt_probe::Severity;
@@ -42,11 +42,11 @@ pub enum DeviceFlowIssue {
 impl std::fmt::Display for DeviceFlowIssue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::NoRateLimitOnPoll       => write!(f, "no rate-limit on token poll"),
-            Self::DeviceCodeReuse         => write!(f, "device code reusable after first use"),
-            Self::LongExpiry { seconds }  => write!(f, "device code expiry {seconds}s (>900s)"),
-            Self::NoUserConfirmation      => write!(f, "token issued without user confirmation"),
-            Self::PkceNotEnforced         => write!(f, "PKCE not enforced in device flow"),
+            Self::NoRateLimitOnPoll => write!(f, "no rate-limit on token poll"),
+            Self::DeviceCodeReuse => write!(f, "device code reusable after first use"),
+            Self::LongExpiry { seconds } => write!(f, "device code expiry {seconds}s (>900s)"),
+            Self::NoUserConfirmation => write!(f, "token issued without user confirmation"),
+            Self::PkceNotEnforced => write!(f, "PKCE not enforced in device flow"),
         }
     }
 }
@@ -131,10 +131,14 @@ impl OAuthDeviceFlowBuilder {
 
     pub fn build(self) -> Result<OAuthDeviceProbe> {
         if self.device_endpoint.is_empty() {
-            return Err(anyhow!(DeviceProbeError::Config("device_endpoint is required".into())));
+            return Err(anyhow!(DeviceProbeError::Config(
+                "device_endpoint is required".into()
+            )));
         }
         if self.token_endpoint.is_empty() {
-            return Err(anyhow!(DeviceProbeError::Config("token_endpoint is required".into())));
+            return Err(anyhow!(DeviceProbeError::Config(
+                "token_endpoint is required".into()
+            )));
         }
         Ok(OAuthDeviceProbe {
             client_id: self.client_id,
@@ -206,7 +210,9 @@ impl OAuthDeviceProbe {
         if throttled {
             Ok(DeviceFlowFinding {
                 issue: DeviceFlowIssue::NoRateLimitOnPoll,
-                evidence: format!("server throttled after {attempts} attempts — rate-limiting present"),
+                evidence: format!(
+                    "server throttled after {attempts} attempts — rate-limiting present"
+                ),
                 severity: Severity::Low,
             })
         } else {
@@ -250,7 +256,9 @@ impl OAuthDeviceProbe {
         if reused {
             Ok(DeviceFlowFinding {
                 issue: DeviceFlowIssue::DeviceCodeReuse,
-                evidence: format!("server returned status {status} on second exchange — code reusable"),
+                evidence: format!(
+                    "server returned status {status} on second exchange — code reusable"
+                ),
                 severity: Severity::High,
             })
         } else {
@@ -266,17 +274,11 @@ impl OAuthDeviceProbe {
 
     /// Request a device code and check the `expires_in` field.  Values greater
     /// than 900 seconds (15 minutes) exceed the RFC 8628 SHOULD limit.
-    pub async fn probe_expiry(
-        &self,
-        client: &dyn DeviceHttpClient,
-    ) -> Result<DeviceFlowFinding> {
+    pub async fn probe_expiry(&self, client: &dyn DeviceHttpClient) -> Result<DeviceFlowFinding> {
         let (status, body) = client
             .post_form(
                 &self.device_endpoint,
-                &[
-                    ("client_id", &self.client_id),
-                    ("scope", "openid"),
-                ],
+                &[("client_id", &self.client_id), ("scope", "openid")],
             )
             .await
             .map_err(|e| anyhow!("HTTP error: {e}"))?;
@@ -319,15 +321,15 @@ impl OAuthDeviceProbe {
         let mut findings = Vec::new();
 
         match self.probe_rate_limit(client, device_code).await {
-            Ok(f)  => findings.push(f),
+            Ok(f) => findings.push(f),
             Err(e) => tracing::warn!(error = %e, "probe_rate_limit failed"),
         }
         match self.probe_code_reuse(client, device_code).await {
-            Ok(f)  => findings.push(f),
+            Ok(f) => findings.push(f),
             Err(e) => tracing::warn!(error = %e, "probe_code_reuse failed"),
         }
         match self.probe_expiry(client).await {
-            Ok(f)  => findings.push(f),
+            Ok(f) => findings.push(f),
             Err(e) => tracing::warn!(error = %e, "probe_expiry failed"),
         }
 
@@ -347,7 +349,10 @@ fn parse_u64_field(json: &str, field: &str) -> Option<u64> {
     let colon = after.find(':')? + 1;
     let value_str = after[colon..].trim_start();
     // Read digits.
-    let digits: String = value_str.chars().take_while(|c| c.is_ascii_digit()).collect();
+    let digits: String = value_str
+        .chars()
+        .take_while(|c| c.is_ascii_digit())
+        .collect();
     digits.parse().ok()
 }
 
@@ -402,7 +407,15 @@ mod tests {
 
     #[test]
     fn device_flow_issue_display() {
-        assert!(DeviceFlowIssue::LongExpiry { seconds: 3600 }.to_string().contains("3600"));
-        assert!(DeviceFlowIssue::NoRateLimitOnPoll.to_string().contains("rate"));
+        assert!(
+            DeviceFlowIssue::LongExpiry { seconds: 3600 }
+                .to_string()
+                .contains("3600")
+        );
+        assert!(
+            DeviceFlowIssue::NoRateLimitOnPoll
+                .to_string()
+                .contains("rate")
+        );
     }
 }

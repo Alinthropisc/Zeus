@@ -8,16 +8,15 @@
 use futures::StreamExt;
 use zeus_attack::{
     AttackStrategy, BruteForceStrategy, CheckpointStrategy, CombinatorStrategy,
-    DeduplicateStrategy, DictionaryStrategy, MaskStrategy, Rule, RuleSet, RulesStrategy,
-    Wordlist,
+    DeduplicateStrategy, DictionaryStrategy, MaskStrategy, Rule, RuleSet, RulesStrategy, Wordlist,
 };
 use zeus_core::Credential;
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 fn collect_blocking(strategy: &dyn AttackStrategy) -> Vec<Credential> {
-    let rt = tokio::runtime::Runtime::new()
-        .expect("tokio runtime must build for blocking collection");
+    let rt =
+        tokio::runtime::Runtime::new().expect("tokio runtime must build for blocking collection");
     rt.block_on(async { strategy.credentials().collect::<Vec<_>>().await })
 }
 
@@ -37,7 +36,11 @@ mod brute_force {
     #[test]
     fn test_brute_force_strategy_name() {
         let bf = BruteForceStrategy::new("admin", "ab", 1, 1);
-        assert_eq!(bf.name(), "brute-force", "BruteForceStrategy must report name 'brute-force'");
+        assert_eq!(
+            bf.name(),
+            "brute-force",
+            "BruteForceStrategy must report name 'brute-force'"
+        );
     }
 
     #[test]
@@ -147,10 +150,7 @@ mod dictionary {
     #[test]
     fn test_dictionary_multiple_usernames_produce_cross_product() {
         // 2 users × 3 words = 6 credentials
-        let s = DictionaryStrategy::new(
-            vec!["alice".into(), "bob".into()],
-            wl(&["a", "b", "c"]),
-        );
+        let s = DictionaryStrategy::new(vec!["alice".into(), "bob".into()], wl(&["a", "b", "c"]));
         assert_eq!(
             s.estimated_count(),
             Some(6),
@@ -168,10 +168,19 @@ mod dictionary {
         // credential_pairs mode: each entry is "user:pass"
         let s = DictionaryStrategy::credential_pairs(wl(&["root:toor", "admin:admin"]));
         let creds = collect_blocking(&s);
-        assert_eq!(creds.len(), 2, "two colon-separated pairs must yield two credentials");
-        let root_cred = creds.iter().find(|c| c.username == "root")
+        assert_eq!(
+            creds.len(),
+            2,
+            "two colon-separated pairs must yield two credentials"
+        );
+        let root_cred = creds
+            .iter()
+            .find(|c| c.username == "root")
             .expect("credential for 'root' must be present");
-        assert_eq!(root_cred.password, "toor", "password after colon must be 'toor'");
+        assert_eq!(
+            root_cred.password, "toor",
+            "password after colon must be 'toor'"
+        );
     }
 
     #[test]
@@ -213,8 +222,7 @@ mod mask {
         let expected = m.estimated_count().expect("estimate must be Some");
         let count = m.credentials().count().await;
         assert_eq!(
-            count as u64,
-            expected,
+            count as u64, expected,
             "collected stream must contain exactly estimated_count items"
         );
     }
@@ -323,13 +331,12 @@ mod combinator {
 
     #[tokio::test]
     async fn test_combinator_separator_inserted_between_words() {
-        let s = CombinatorStrategy::new("u", words(&["pass"]), words(&["word"]))
-            .with_separator("-");
+        let s =
+            CombinatorStrategy::new("u", words(&["pass"]), words(&["word"])).with_separator("-");
         let creds: Vec<_> = s.credentials().collect().await;
         assert_eq!(creds.len(), 1, "one pair must yield one credential");
         assert_eq!(
-            creds[0].password,
-            "pass-word",
+            creds[0].password, "pass-word",
             "separator '-' must appear between the two words"
         );
     }
@@ -363,15 +370,21 @@ mod combinator {
 
 mod dedup {
     use super::*;
-    use zeus_attack::CredentialStream;
     use tokio_stream::iter;
+    use zeus_attack::CredentialStream;
 
     struct FixedStrategy(Vec<Credential>);
 
     impl AttackStrategy for FixedStrategy {
-        fn name(&self) -> &'static str { "fixed" }
-        fn credentials(&self) -> CredentialStream { Box::pin(iter(self.0.clone())) }
-        fn estimated_count(&self) -> Option<u64> { Some(self.0.len() as u64) }
+        fn name(&self) -> &'static str {
+            "fixed"
+        }
+        fn credentials(&self) -> CredentialStream {
+            Box::pin(iter(self.0.clone()))
+        }
+        fn estimated_count(&self) -> Option<u64> {
+            Some(self.0.len() as u64)
+        }
     }
 
     fn cred(u: &str, p: &str) -> Credential {
@@ -399,9 +412,9 @@ mod dedup {
         let inner = FixedStrategy(vec![
             cred("u", "alpha"),
             cred("u", "beta"),
-            cred("u", "alpha"),  // duplicate
+            cred("u", "alpha"), // duplicate
             cred("u", "gamma"),
-            cred("u", "beta"),   // duplicate
+            cred("u", "beta"), // duplicate
         ]);
         let s = DeduplicateStrategy::new(Box::new(inner));
         let creds = collect_blocking(&s);
@@ -457,15 +470,21 @@ mod dedup {
 
 mod checkpoint {
     use super::*;
-    use zeus_attack::CredentialStream;
     use tokio_stream::iter;
+    use zeus_attack::CredentialStream;
 
     struct FixedStrategy(Vec<Credential>);
 
     impl AttackStrategy for FixedStrategy {
-        fn name(&self) -> &'static str { "fixed" }
-        fn credentials(&self) -> CredentialStream { Box::pin(iter(self.0.clone())) }
-        fn estimated_count(&self) -> Option<u64> { Some(self.0.len() as u64) }
+        fn name(&self) -> &'static str {
+            "fixed"
+        }
+        fn credentials(&self) -> CredentialStream {
+            Box::pin(iter(self.0.clone()))
+        }
+        fn estimated_count(&self) -> Option<u64> {
+            Some(self.0.len() as u64)
+        }
     }
 
     fn numbered_creds(n: usize) -> Vec<Credential> {
@@ -492,25 +511,18 @@ mod checkpoint {
 
     #[test]
     fn test_checkpoint_resume_skips_correct_number() {
-        let s = CheckpointStrategy::resume_from(
-            Box::new(FixedStrategy(numbered_creds(10))),
-            3,
-        );
+        let s = CheckpointStrategy::resume_from(Box::new(FixedStrategy(numbered_creds(10))), 3);
         let creds = collect_blocking(&s);
         assert_eq!(creds.len(), 7, "skipping 3 of 10 must leave 7 credentials");
         assert_eq!(
-            creds[0].password,
-            "pass3",
+            creds[0].password, "pass3",
             "first credential after skip must be the fourth (index 3)"
         );
     }
 
     #[test]
     fn test_checkpoint_estimated_count_decrements_by_skip() {
-        let s = CheckpointStrategy::resume_from(
-            Box::new(FixedStrategy(numbered_creds(10))),
-            4,
-        );
+        let s = CheckpointStrategy::resume_from(Box::new(FixedStrategy(numbered_creds(10))), 4);
         assert_eq!(
             s.estimated_count(),
             Some(6),
@@ -520,10 +532,7 @@ mod checkpoint {
 
     #[test]
     fn test_checkpoint_skip_beyond_total_yields_empty_stream() {
-        let s = CheckpointStrategy::resume_from(
-            Box::new(FixedStrategy(numbered_creds(5))),
-            100,
-        );
+        let s = CheckpointStrategy::resume_from(Box::new(FixedStrategy(numbered_creds(5))), 100);
         assert!(
             collect_blocking(&s).is_empty(),
             "skipping more than total must yield an empty stream"
@@ -532,10 +541,7 @@ mod checkpoint {
 
     #[test]
     fn test_checkpoint_estimated_count_saturates_at_zero() {
-        let s = CheckpointStrategy::resume_from(
-            Box::new(FixedStrategy(numbered_creds(5))),
-            100,
-        );
+        let s = CheckpointStrategy::resume_from(Box::new(FixedStrategy(numbered_creds(5))), 100);
         assert_eq!(
             s.estimated_count(),
             Some(0),
@@ -744,21 +750,15 @@ mod rules {
     #[tokio::test]
     async fn test_rules_strategy_applies_hashcat_rules_to_each_word() {
         // Rule chain: uppercase ("u") then append '!' ("$!")
-        let s = RulesStrategy::new(
-            "admin",
-            words(&["alpha", "beta"]),
-            &["u", "$!"],
-        );
+        let s = RulesStrategy::new("admin", words(&["alpha", "beta"]), &["u", "$!"]);
         let creds: Vec<_> = s.credentials().collect().await;
         assert_eq!(creds.len(), 2, "two words must produce two credentials");
         assert_eq!(
-            creds[0].password,
-            "ALPHA!",
+            creds[0].password, "ALPHA!",
             "first word 'alpha' uppercased then '!' appended must be 'ALPHA!'"
         );
         assert_eq!(
-            creds[1].password,
-            "BETA!",
+            creds[1].password, "BETA!",
             "second word 'beta' uppercased then '!' appended must be 'BETA!'"
         );
     }
@@ -794,7 +794,10 @@ mod wordlist {
     #[test]
     fn test_wordlist_is_empty_on_empty_input() {
         let list = Wordlist::from_vec(vec![]);
-        assert!(list.is_empty(), "empty from_vec must report is_empty = true");
+        assert!(
+            list.is_empty(),
+            "empty from_vec must report is_empty = true"
+        );
     }
 
     #[test]
@@ -811,7 +814,11 @@ mod wordlist {
     fn test_wordlist_credential_pairs_splits_colon_entries() {
         let list = Wordlist::from_vec(words(&["alice:wonderland", "bob:builder"]));
         let pairs: Vec<_> = list.credential_pairs().collect();
-        assert_eq!(pairs.len(), 2, "two colon entries must yield two credential pairs");
+        assert_eq!(
+            pairs.len(),
+            2,
+            "two colon entries must yield two credential pairs"
+        );
         assert_eq!(pairs[0].username, "alice");
         assert_eq!(pairs[0].password, "wonderland");
     }
@@ -819,7 +826,11 @@ mod wordlist {
     #[test]
     fn test_wordlist_built_in_top10_has_ten_entries() {
         let list = Wordlist::built_in("top10").expect("built-in 'top10' must exist");
-        assert_eq!(list.len(), 10, "top10 built-in wordlist must contain exactly 10 entries");
+        assert_eq!(
+            list.len(),
+            10,
+            "top10 built-in wordlist must contain exactly 10 entries"
+        );
     }
 
     #[test]
@@ -833,22 +844,26 @@ mod wordlist {
     #[test]
     fn test_wordlist_from_file_temp_path() {
         use std::io::Write;
-        let mut tmp = tempfile::NamedTempFile::new()
-            .expect("temp file must be created");
+        let mut tmp = tempfile::NamedTempFile::new().expect("temp file must be created");
         writeln!(tmp, "# comment line").expect("write comment");
         writeln!(tmp, "secret1").expect("write entry 1");
         writeln!(tmp, "").expect("write blank line");
         writeln!(tmp, "secret2").expect("write entry 2");
 
-        let list = Wordlist::from_file(tmp.path())
-            .expect("from_file must succeed on a valid file");
+        let list = Wordlist::from_file(tmp.path()).expect("from_file must succeed on a valid file");
         assert_eq!(
             list.len(),
             2,
             "from_file must skip comment lines and blank lines, keeping 2 entries"
         );
         let passwords: Vec<&str> = list.passwords().collect();
-        assert!(passwords.contains(&"secret1"), "first entry must be 'secret1'");
-        assert!(passwords.contains(&"secret2"), "second entry must be 'secret2'");
+        assert!(
+            passwords.contains(&"secret1"),
+            "first entry must be 'secret1'"
+        );
+        assert!(
+            passwords.contains(&"secret2"),
+            "second entry must be 'secret2'"
+        );
     }
 }

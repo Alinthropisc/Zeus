@@ -1,11 +1,11 @@
+use crate::net::TcpConnection;
 use async_trait::async_trait;
-use des::cipher::{BlockEncrypt, KeyInit};
 use des::Des;
+use des::cipher::{BlockEncrypt, KeyInit};
 use std::net::ToSocketAddrs;
 use std::time::Instant;
 use tracing::debug;
 use zeus_core::{AttackConfig, AttackResult, Credential, Protocol, Target, ZeusError};
-use crate::net::TcpConnection;
 
 pub struct VncProtocol;
 
@@ -40,9 +40,15 @@ fn des_encrypt_block(input: &[u8], key: &[u8; 8]) -> [u8; 8] {
 
 #[async_trait]
 impl Protocol for VncProtocol {
-    fn name(&self) -> &'static str { "vnc" }
-    fn default_port(&self) -> u16 { 5900 }
-    fn description(&self) -> &'static str { "VNC RFB 3.3/3.7/3.8 password authentication (DES challenge)" }
+    fn name(&self) -> &'static str {
+        "vnc"
+    }
+    fn default_port(&self) -> u16 {
+        5900
+    }
+    fn description(&self) -> &'static str {
+        "VNC RFB 3.3/3.7/3.8 password authentication (DES challenge)"
+    }
 
     async fn authenticate(
         &self,
@@ -51,15 +57,21 @@ impl Protocol for VncProtocol {
         config: &AttackConfig,
     ) -> Result<AttackResult, ZeusError> {
         let addr_str = format!("{}:{}", target.host, target.port);
-        let addr = addr_str.to_socket_addrs().map_err(ZeusError::Network)?
-            .next().ok_or_else(|| ZeusError::Protocol("DNS failed".into()))?;
+        let addr = addr_str
+            .to_socket_addrs()
+            .map_err(ZeusError::Network)?
+            .next()
+            .ok_or_else(|| ZeusError::Protocol("DNS failed".into()))?;
 
         let start = Instant::now();
-        let mut conn = TcpConnection::connect(addr, config.timeout).await
+        let mut conn = TcpConnection::connect(addr, config.timeout)
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
 
         // Read RFB version string "RFB 003.003\n" or "RFB 003.008\n"
-        let version_buf = conn.read_until_crlf().await
+        let version_buf = conn
+            .read_until_crlf()
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
         let version_str = String::from_utf8_lossy(&version_buf);
         debug!("VNC server version: {:?}", version_str);
@@ -70,14 +82,20 @@ impl Protocol for VncProtocol {
         }
 
         // Send our version (3.3 for maximum compatibility)
-        conn.write_all(b"RFB 003.003\n").await
+        conn.write_all(b"RFB 003.003\n")
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
 
         // Read security type: 4 bytes, little-endian
         // 0x00000000 = error, 0x00000001 = None, 0x00000002 = VNC auth
-        let sec_buf = conn.read_until_crlf().await
+        let sec_buf = conn
+            .read_until_crlf()
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
-        debug!("VNC security type bytes: {:?}", &sec_buf[..sec_buf.len().min(4)]);
+        debug!(
+            "VNC security type bytes: {:?}",
+            &sec_buf[..sec_buf.len().min(4)]
+        );
 
         if sec_buf.len() < 4 {
             let _ = conn.shutdown().await;
@@ -90,16 +108,23 @@ impl Protocol for VncProtocol {
         if sec_type == 1 {
             // No auth required
             let _ = conn.shutdown().await;
-            return Ok(AttackResult::Error("VNC: No authentication required".into()));
+            return Ok(AttackResult::Error(
+                "VNC: No authentication required".into(),
+            ));
         }
 
         if sec_type != 2 {
             let _ = conn.shutdown().await;
-            return Ok(AttackResult::Error(format!("VNC: Unsupported security type {}", sec_type)));
+            return Ok(AttackResult::Error(format!(
+                "VNC: Unsupported security type {}",
+                sec_type
+            )));
         }
 
         // Read 16-byte challenge
-        let challenge_buf = conn.read_until_crlf().await
+        let challenge_buf = conn
+            .read_until_crlf()
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
         if challenge_buf.len() < 16 {
             let _ = conn.shutdown().await;
@@ -112,19 +137,26 @@ impl Protocol for VncProtocol {
 
         // Encrypt the challenge with the password
         let response = vnc_des_encrypt(&challenge, &cred.password);
-        conn.write_all(&response).await
+        conn.write_all(&response)
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
 
         // Read auth result: 4 bytes, 0 = OK, non-0 = failed
-        let result_buf = conn.read_until_crlf().await
+        let result_buf = conn
+            .read_until_crlf()
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
 
         let _ = conn.shutdown().await;
 
         if result_buf.len() >= 4 {
-            let result_code = u32::from_be_bytes([result_buf[0], result_buf[1], result_buf[2], result_buf[3]]);
+            let result_code =
+                u32::from_be_bytes([result_buf[0], result_buf[1], result_buf[2], result_buf[3]]);
             if result_code == 0 {
-                return Ok(AttackResult::Success { credential: cred.clone(), elapsed: start.elapsed() });
+                return Ok(AttackResult::Success {
+                    credential: cred.clone(),
+                    elapsed: start.elapsed(),
+                });
             }
         }
 

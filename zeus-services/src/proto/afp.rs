@@ -15,12 +15,12 @@
 //!   5. Read DSI response; check errorCode (bytes 4–7 of header, big-endian i32)
 //!      0 = success, -5023 = kFPAuthContinue (bad credential), other negative = error
 
+use crate::net::TcpConnection;
 use async_trait::async_trait;
 use std::net::ToSocketAddrs;
 use std::time::Instant;
 use tracing::debug;
 use zeus_core::{AttackConfig, AttackResult, Credential, Protocol, Target, ZeusError};
-use crate::net::TcpConnection;
 
 pub struct AfpProtocol;
 
@@ -29,21 +29,21 @@ pub struct AfpProtocol;
 /// Size of the DSI header in bytes.
 pub const DSI_HEADER_SIZE: usize = 16;
 
-const DSI_FLAGS_REQUEST:  u8 = 0x00;
-const DSI_FLAGS_REPLY:    u8 = 0x01;
+const DSI_FLAGS_REQUEST: u8 = 0x00;
+const DSI_FLAGS_REPLY: u8 = 0x01;
 
 const DSI_CMD_CLOSE_SESSION: u8 = 1;
-const DSI_CMD_COMMAND:       u8 = 6;
-const DSI_CMD_OPEN_SESSION:  u8 = 4;
+const DSI_CMD_COMMAND: u8 = 6;
+const DSI_CMD_OPEN_SESSION: u8 = 4;
 #[allow(dead_code)]
-const DSI_CMD_WRITE:         u8 = 8;
+const DSI_CMD_WRITE: u8 = 8;
 
 // AFP FPLogin command ID
 const AFP_CMD_LOGIN: u8 = 18;
 
 // AFP error codes
-const AFP_NO_ERR:       i32 =  0;
-const AFP_AUTH_CONT:    i32 = -5023; // kFPAuthContinue — wrong credentials
+const AFP_NO_ERR: i32 = 0;
+const AFP_AUTH_CONT: i32 = -5023; // kFPAuthContinue — wrong credentials
 #[allow(dead_code)]
 const AFP_USER_NOT_AUTH: i32 = -5019; // kFPUserNotAuth
 
@@ -102,7 +102,7 @@ pub fn dsi_close_session(request_id: u16) -> Vec<u8> {
 /// Pascal string: 1-byte length prefix + characters (no null terminator).
 pub fn afp_login(username: &str, password: &str) -> Vec<u8> {
     let afp_version = b"AFPVersion 3.1";
-    let uam        = b"Cleartxt Passwrd";
+    let uam = b"Cleartxt Passwrd";
 
     let mut data: Vec<u8> = Vec::new();
 
@@ -141,7 +141,9 @@ pub fn afp_login(username: &str, password: &str) -> Vec<u8> {
 
 /// Read a DSI response header (16 bytes).
 async fn read_dsi_header(conn: &mut TcpConnection) -> Result<[u8; DSI_HEADER_SIZE], ZeusError> {
-    let raw = conn.read_bytes(DSI_HEADER_SIZE).await
+    let raw = conn
+        .read_bytes(DSI_HEADER_SIZE)
+        .await
         .map_err(|e| ZeusError::Protocol(format!("AFP: DSI header read: {e}")))?;
     if raw.len() < DSI_HEADER_SIZE {
         return Err(ZeusError::Protocol("AFP: DSI header truncated".into()));
@@ -157,10 +159,16 @@ pub fn dsi_error_code(hdr: &[u8; DSI_HEADER_SIZE]) -> i32 {
 }
 
 /// Drain the DSI response body (totalDataLength at bytes 8–11).
-async fn drain_dsi_body(conn: &mut TcpConnection, hdr: &[u8; DSI_HEADER_SIZE]) -> Result<Vec<u8>, ZeusError> {
+async fn drain_dsi_body(
+    conn: &mut TcpConnection,
+    hdr: &[u8; DSI_HEADER_SIZE],
+) -> Result<Vec<u8>, ZeusError> {
     let body_len = u32::from_be_bytes([hdr[8], hdr[9], hdr[10], hdr[11]]) as usize;
-    if body_len == 0 { return Ok(vec![]); }
-    conn.read_bytes(body_len).await
+    if body_len == 0 {
+        return Ok(vec![]);
+    }
+    conn.read_bytes(body_len)
+        .await
         .map_err(|e| ZeusError::Protocol(format!("AFP: DSI body read: {e}")))
 }
 
@@ -168,8 +176,12 @@ async fn drain_dsi_body(conn: &mut TcpConnection, hdr: &[u8; DSI_HEADER_SIZE]) -
 
 #[async_trait]
 impl Protocol for AfpProtocol {
-    fn name(&self) -> &'static str { "afp" }
-    fn default_port(&self) -> u16 { 548 }
+    fn name(&self) -> &'static str {
+        "afp"
+    }
+    fn default_port(&self) -> u16 {
+        548
+    }
     fn description(&self) -> &'static str {
         "Apple Filing Protocol (AFP) cleartext password authentication over DSI/TCP"
     }
@@ -188,12 +200,14 @@ impl Protocol for AfpProtocol {
             .ok_or_else(|| ZeusError::Protocol("DNS resolution failed".into()))?;
 
         let start = Instant::now();
-        let mut conn = TcpConnection::connect(addr, config.timeout).await
+        let mut conn = TcpConnection::connect(addr, config.timeout)
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
 
         // ── Step 1: DSI OpenSession ────────────────────────────────────────
         let open = dsi_open_session(1);
-        conn.write_all(&open).await
+        conn.write_all(&open)
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
         debug!("AFP: sent DSI OpenSession");
 
@@ -202,25 +216,27 @@ impl Protocol for AfpProtocol {
 
         if open_hdr[1] != DSI_CMD_OPEN_SESSION || open_hdr[0] != DSI_FLAGS_REPLY {
             let _ = conn.shutdown().await;
-            return Ok(AttackResult::Error(
-                format!("AFP: unexpected OpenSession response flags=0x{:02X} cmd=0x{:02X}",
-                        open_hdr[0], open_hdr[1]),
-            ));
+            return Ok(AttackResult::Error(format!(
+                "AFP: unexpected OpenSession response flags=0x{:02X} cmd=0x{:02X}",
+                open_hdr[0], open_hdr[1]
+            )));
         }
 
         let open_err = dsi_error_code(&open_hdr);
         if open_err != AFP_NO_ERR {
             let _ = conn.shutdown().await;
-            return Ok(AttackResult::Error(
-                format!("AFP: OpenSession error code {}", open_err),
-            ));
+            return Ok(AttackResult::Error(format!(
+                "AFP: OpenSession error code {}",
+                open_err
+            )));
         }
         debug!("AFP: DSI session opened");
 
         // ── Step 2: AFP FPLogin ────────────────────────────────────────────
         let login_data = afp_login(&cred.username, &cred.password);
-        let login_pkt  = dsi_command(2, &login_data);
-        conn.write_all(&login_pkt).await
+        let login_pkt = dsi_command(2, &login_data);
+        conn.write_all(&login_pkt)
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
         debug!("AFP: sent FPLogin for user '{}'", cred.username);
 
@@ -238,9 +254,10 @@ impl Protocol for AfpProtocol {
             }),
             AFP_AUTH_CONT => Ok(AttackResult::Failure),
             other if other < 0 => Ok(AttackResult::Failure),
-            other => Ok(AttackResult::Error(
-                format!("AFP: unexpected error code {}", other),
-            )),
+            other => Ok(AttackResult::Error(format!(
+                "AFP: unexpected error code {}",
+                other
+            ))),
         }
     }
 }

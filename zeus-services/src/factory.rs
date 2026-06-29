@@ -151,7 +151,9 @@ impl ProtocolFactory {
     /// Use [`Self::with_defaults`] to get a factory pre-loaded with all
     /// built-in protocol handlers.
     pub fn new() -> Self {
-        Self { handlers: HashMap::new() }
+        Self {
+            handlers: HashMap::new(),
+        }
     }
 
     /// Register a handler.
@@ -198,15 +200,15 @@ impl ProtocolFactory {
     /// [`ProtocolHandlerAdapter`].
     pub fn with_defaults() -> Self {
         use crate::database::{
-            FirebirdProtocol, MemcachedProtocol, MongoDbProtocol, MssqlProtocol,
-            MySqlProtocol, OracleProtocol, PostgresProtocol, RedisProtocol,
+            FirebirdProtocol, MemcachedProtocol, MongoDbProtocol, MssqlProtocol, MySqlProtocol,
+            OracleProtocol, PostgresProtocol, RedisProtocol,
         };
         use crate::proto::{
             CvsProtocol, FtpProtocol, HttpFormProtocol, HttpProtocol, HttpProxyProtocol,
-            ImapProtocol, IrcProtocol, LdapProtocol, NntpProtocol, Pop3Protocol,
-            RdpProtocol, RexecProtocol, RshProtocol, RtspProtocol, SipProtocol,
-            SmbProtocol, SmtpEnumProtocol, SmtpProtocol, SnmpProtocol, Socks5Protocol,
-            SshProtocol, SvnProtocol, TelnetProtocol, VncProtocol, XmppProtocol,
+            ImapProtocol, IrcProtocol, LdapProtocol, NntpProtocol, Pop3Protocol, RdpProtocol,
+            RexecProtocol, RshProtocol, RtspProtocol, SipProtocol, SmbProtocol, SmtpEnumProtocol,
+            SmtpProtocol, SnmpProtocol, Socks5Protocol, SshProtocol, SvnProtocol, TelnetProtocol,
+            VncProtocol, XmppProtocol,
         };
 
         let mut f = Self::new();
@@ -214,46 +216,49 @@ impl ProtocolFactory {
         // Convenience macro: wrap a Protocol impl in an adapter and register it.
         macro_rules! reg {
             ($name:literal, $ctor:expr) => {
-                f.register(Arc::new(ProtocolHandlerAdapter::new(Arc::new($ctor), $name)));
+                f.register(Arc::new(ProtocolHandlerAdapter::new(
+                    Arc::new($ctor),
+                    $name,
+                )));
             };
         }
 
         // ── Application layer ─────────────────────────────────────────────────
-        reg!("http",       HttpProtocol::default());
-        reg!("http-form",  HttpFormProtocol::default());
+        reg!("http", HttpProtocol::default());
+        reg!("http-form", HttpFormProtocol::default());
         reg!("http-proxy", HttpProxyProtocol::default());
-        reg!("ftp",        FtpProtocol);
-        reg!("smtp",       SmtpProtocol);
-        reg!("smtp-enum",  SmtpEnumProtocol);
-        reg!("pop3",       Pop3Protocol);
-        reg!("imap",       ImapProtocol);
-        reg!("nntp",       NntpProtocol);
-        reg!("telnet",     TelnetProtocol);
-        reg!("ssh",        SshProtocol);
-        reg!("irc",        IrcProtocol);
-        reg!("xmpp",       XmppProtocol);
-        reg!("sip",        SipProtocol);
-        reg!("rtsp",       RtspProtocol::default());
-        reg!("svn",        SvnProtocol::default());
-        reg!("cvs",        CvsProtocol);
-        reg!("socks5",     Socks5Protocol);
+        reg!("ftp", FtpProtocol);
+        reg!("smtp", SmtpProtocol);
+        reg!("smtp-enum", SmtpEnumProtocol);
+        reg!("pop3", Pop3Protocol);
+        reg!("imap", ImapProtocol);
+        reg!("nntp", NntpProtocol);
+        reg!("telnet", TelnetProtocol);
+        reg!("ssh", SshProtocol);
+        reg!("irc", IrcProtocol);
+        reg!("xmpp", XmppProtocol);
+        reg!("sip", SipProtocol);
+        reg!("rtsp", RtspProtocol::default());
+        reg!("svn", SvnProtocol::default());
+        reg!("cvs", CvsProtocol);
+        reg!("socks5", Socks5Protocol);
         // ── Network / system ──────────────────────────────────────────────────
-        reg!("ldap",       LdapProtocol);
-        reg!("snmp",       SnmpProtocol);
-        reg!("smb",        SmbProtocol);
-        reg!("rdp",        RdpProtocol);
-        reg!("vnc",        VncProtocol);
-        reg!("rsh",        RshProtocol);
-        reg!("rexec",      RexecProtocol);
+        reg!("ldap", LdapProtocol);
+        reg!("snmp", SnmpProtocol);
+        reg!("smb", SmbProtocol);
+        reg!("rdp", RdpProtocol);
+        reg!("vnc", VncProtocol);
+        reg!("rsh", RshProtocol);
+        reg!("rexec", RexecProtocol);
         // ── Databases ─────────────────────────────────────────────────────────
-        reg!("mysql",      MySqlProtocol);
-        reg!("postgres",   PostgresProtocol);
-        reg!("redis",      RedisProtocol);
-        reg!("mssql",      MssqlProtocol);
-        reg!("mongodb",    MongoDbProtocol);
-        reg!("memcached",  MemcachedProtocol);
-        reg!("oracle",     OracleProtocol);
-        reg!("firebird",   FirebirdProtocol);
+        reg!("mysql", MySqlProtocol);
+        reg!("postgres", PostgresProtocol);
+        reg!("redis", RedisProtocol);
+        reg!("mssql", MssqlProtocol);
+        reg!("mongodb", MongoDbProtocol);
+        reg!("memcached", MemcachedProtocol);
+        reg!("oracle", OracleProtocol);
+        reg!("firebird", FirebirdProtocol);
 
         f
     }
@@ -290,7 +295,9 @@ mod tests {
     #[test]
     fn with_defaults_registers_key_protocols() {
         let f = ProtocolFactory::with_defaults();
-        for name in &["ftp", "http", "ssh", "smtp", "mysql", "redis", "smb", "ldap", "rdp"] {
+        for name in &[
+            "ftp", "http", "ssh", "smtp", "mysql", "redis", "smb", "ldap", "rdp",
+        ] {
             assert!(
                 f.create(name).is_some(),
                 "missing '{}' in ProtocolFactory::with_defaults()",
@@ -324,12 +331,10 @@ mod tests {
 
         #[async_trait::async_trait]
         impl ProtocolHandler for AlwaysTimeout {
-            fn name(&self) -> &'static str { "ftp" }
-            async fn probe(
-                &self,
-                _: &Target,
-                _: &Credential,
-            ) -> Result<ProbeResult, ZeusError> {
+            fn name(&self) -> &'static str {
+                "ftp"
+            }
+            async fn probe(&self, _: &Target, _: &Credential) -> Result<ProbeResult, ZeusError> {
                 Ok(ProbeResult::Timeout)
             }
         }

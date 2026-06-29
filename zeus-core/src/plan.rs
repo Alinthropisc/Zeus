@@ -61,7 +61,10 @@ pub enum CredentialSpec {
     /// One username + a path to a password wordlist file.
     Wordlist { username: String, path: String },
     /// Multiple usernames each tried against a wordlist file.
-    MultiUser { usernames: Vec<String>, path: String },
+    MultiUser {
+        usernames: Vec<String>,
+        path: String,
+    },
     /// Pure brute-force over a character set between `min_len` and `max_len`.
     BruteForce {
         username: String,
@@ -109,6 +112,7 @@ impl Default for OutputSpec {
 
 impl AttackPlan {
     /// Start building a new plan with the given name.
+    #[allow(clippy::new_ret_no_self)]
     pub fn new(name: impl Into<String>) -> AttackPlanBuilder {
         AttackPlanBuilder::new(name)
     }
@@ -190,7 +194,12 @@ impl AttackPlan {
                     errors.push("credentials.multi_user: path is empty".to_string());
                 }
             }
-            CredentialSpec::BruteForce { username, charset, min_len, max_len } => {
+            CredentialSpec::BruteForce {
+                username,
+                charset,
+                min_len,
+                max_len,
+            } => {
                 if username.trim().is_empty() {
                     errors.push("credentials.brute_force: username is empty".to_string());
                 }
@@ -254,7 +263,9 @@ impl AttackPlanBuilder {
             plan: AttackPlan {
                 name: name.into(),
                 targets: Vec::new(),
-                credentials: CredentialSpec::Inline { credentials: Vec::new() },
+                credentials: CredentialSpec::Inline {
+                    credentials: Vec::new(),
+                },
                 config: AttackConfig::default(),
                 output: OutputSpec::default(),
             },
@@ -274,7 +285,9 @@ impl AttackPlanBuilder {
         port: u16,
         protocol: impl Into<String>,
     ) -> Self {
-        self.plan.targets.push(TargetSpec::new(host, protocol).with_port(port));
+        self.plan
+            .targets
+            .push(TargetSpec::new(host, protocol).with_port(port));
         self
     }
 
@@ -401,11 +414,24 @@ mod tests {
     fn credential_spec_variants_serialize() {
         // Ensure all enum variants round-trip through JSON
         let specs = vec![
-            CredentialSpec::Wordlist { username: "u".into(), path: "p".into() },
-            CredentialSpec::MultiUser { usernames: vec!["a".into()], path: "p".into() },
-            CredentialSpec::BruteForce { username: "u".into(), charset: "abc".into(), min_len: 1, max_len: 4 },
+            CredentialSpec::Wordlist {
+                username: "u".into(),
+                path: "p".into(),
+            },
+            CredentialSpec::MultiUser {
+                usernames: vec!["a".into()],
+                path: "p".into(),
+            },
+            CredentialSpec::BruteForce {
+                username: "u".into(),
+                charset: "abc".into(),
+                min_len: 1,
+                max_len: 4,
+            },
             CredentialSpec::Combo { path: "p".into() },
-            CredentialSpec::Inline { credentials: vec![("u".into(), "p".into())] },
+            CredentialSpec::Inline {
+                credentials: vec![("u".into(), "p".into())],
+            },
         ];
 
         for spec in specs {

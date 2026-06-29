@@ -48,7 +48,11 @@ impl MultiEngine {
     ///
     /// Blocks until every target has been attempted (or cancels early if
     /// `stop_on_first` is set in the config).
-    pub async fn run_all<F>(&self, targets: Vec<Target>, strategy_factory: F) -> Vec<MultiAttackResult>
+    pub async fn run_all<F>(
+        &self,
+        targets: Vec<Target>,
+        strategy_factory: F,
+    ) -> Vec<MultiAttackResult>
     where
         F: Fn(&Target) -> Box<dyn AttackStrategy> + Send + Sync + 'static,
     {
@@ -66,12 +70,14 @@ impl MultiEngine {
                     Ok(p) => p,
                     // Semaphore is only closed if its owner is dropped,
                     // which cannot happen while this future is alive.
-                    Err(_) => return MultiAttackResult {
-                        target,
-                        found: vec![],
-                        attempts: 0,
-                        elapsed: std::time::Duration::ZERO,
-                    },
+                    Err(_) => {
+                        return MultiAttackResult {
+                            target,
+                            found: vec![],
+                            attempts: 0,
+                            elapsed: std::time::Duration::ZERO,
+                        };
+                    }
                 };
                 let strategy = factory(&target);
                 let start = std::time::Instant::now();
@@ -132,12 +138,14 @@ impl MultiEngine {
                 futures.push(async move {
                     let _permit = match sem.acquire_owned().await {
                         Ok(p) => p,
-                        Err(_) => return MultiAttackResult {
-                            target,
-                            found: vec![],
-                            attempts: 0,
-                            elapsed: std::time::Duration::ZERO,
-                        },
+                        Err(_) => {
+                            return MultiAttackResult {
+                                target,
+                                found: vec![],
+                                attempts: 0,
+                                elapsed: std::time::Duration::ZERO,
+                            };
+                        }
                     };
                     let strategy = factory(&target);
                     let start = std::time::Instant::now();
@@ -178,15 +186,21 @@ mod tests {
     use async_trait::async_trait;
     use tokio_stream::iter as stream_iter;
     use zeus_attack::{AttackStrategy, CredentialStream};
-    use zeus_core::{AttackConfig, AttackConfigBuilder, AttackResult, Credential, Protocol, Target, ZeusError};
+    use zeus_core::{
+        AttackConfig, AttackConfigBuilder, AttackResult, Credential, Protocol, Target, ZeusError,
+    };
     use zeus_services::registry::ProtocolRegistry;
 
     struct MockFailureProtocol;
 
     #[async_trait]
     impl Protocol for MockFailureProtocol {
-        fn name(&self) -> &'static str { "mock" }
-        fn default_port(&self) -> u16 { 9999 }
+        fn name(&self) -> &'static str {
+            "mock"
+        }
+        fn default_port(&self) -> u16 {
+            9999
+        }
         async fn authenticate(
             &self,
             _target: &Target,
@@ -202,15 +216,21 @@ mod tests {
     }
 
     impl StaticStrategy {
-        fn new(creds: Vec<Credential>) -> Self { Self { creds } }
+        fn new(creds: Vec<Credential>) -> Self {
+            Self { creds }
+        }
     }
 
     impl AttackStrategy for StaticStrategy {
-        fn name(&self) -> &'static str { "static" }
+        fn name(&self) -> &'static str {
+            "static"
+        }
         fn credentials(&self) -> CredentialStream {
             Box::pin(stream_iter(self.creds.clone()))
         }
-        fn estimated_count(&self) -> Option<u64> { Some(self.creds.len() as u64) }
+        fn estimated_count(&self) -> Option<u64> {
+            Some(self.creds.len() as u64)
+        }
     }
 
     fn mock_registry() -> Arc<ProtocolRegistry> {

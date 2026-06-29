@@ -45,16 +45,13 @@ impl DefectDojoClient {
     }
 
     /// Convert a [`Finding`] to the DefectDojo REST finding payload.
-    pub fn finding_to_payload(
-        finding: &Finding,
-        config: &DefectDojoConfig,
-    ) -> serde_json::Value {
+    pub fn finding_to_payload(finding: &Finding, config: &DefectDojoConfig) -> serde_json::Value {
         let severity_str = match finding.severity {
             Severity::Critical => "Critical",
-            Severity::High     => "High",
-            Severity::Medium   => "Medium",
-            Severity::Low      => "Low",
-            Severity::Info     => "Info",
+            Severity::High => "High",
+            Severity::Medium => "Medium",
+            Severity::Low => "Low",
+            Severity::Info => "Info",
         };
 
         serde_json::json!({
@@ -119,29 +116,22 @@ impl JiraClient {
     fn severity_to_priority(severity: &Severity) -> &'static str {
         match severity {
             Severity::Critical => "Highest",
-            Severity::High     => "High",
-            Severity::Medium   => "Medium",
-            Severity::Low      => "Low",
-            Severity::Info     => "Lowest",
+            Severity::High => "High",
+            Severity::Medium => "Medium",
+            Severity::Low => "Low",
+            Severity::Info => "Lowest",
         }
     }
 
     /// Convert a [`Finding`] to the JIRA issue creation payload (Atlassian Document Format body).
-    pub fn finding_to_payload(
-        finding: &Finding,
-        config: &JiraConfig,
-    ) -> serde_json::Value {
+    pub fn finding_to_payload(finding: &Finding, config: &JiraConfig) -> serde_json::Value {
         let severity_label = format!(
             "{}{}",
             config.severity_label_prefix,
             finding.severity.to_string().to_lowercase()
         );
 
-        let summary = format!(
-            "[Zeus] {}: {}",
-            finding.severity,
-            finding.title,
-        );
+        let summary = format!("[Zeus] {}: {}", finding.severity, finding.title,);
 
         let description_doc = serde_json::json!({
             "type": "doc",
@@ -208,7 +198,12 @@ mod tests {
     }
 
     fn jira_config() -> JiraConfig {
-        JiraConfig::new("https://jira.example.com", "user@example.com", "jira-token", "SEC")
+        JiraConfig::new(
+            "https://jira.example.com",
+            "user@example.com",
+            "jira-token",
+            "SEC",
+        )
     }
 
     #[test]
@@ -230,7 +225,10 @@ mod tests {
         let finding = critical_finding();
         let payload = JiraClient::finding_to_payload(&finding, &jira_config());
         let summary = payload["fields"]["summary"].as_str().unwrap_or("");
-        assert!(summary.contains("CRITICAL"), "expected severity in summary: {summary}");
+        assert!(
+            summary.contains("CRITICAL"),
+            "expected severity in summary: {summary}"
+        );
     }
 
     #[test]
@@ -246,9 +244,9 @@ mod tests {
         let finding = critical_finding();
         let payload = JiraClient::finding_to_payload(&finding, &jira_config());
         let labels = payload["fields"]["labels"].as_array().unwrap();
-        let has_prefixed = labels.iter().any(|l| {
-            l.as_str().unwrap_or("").starts_with("security-")
-        });
+        let has_prefixed = labels
+            .iter()
+            .any(|l| l.as_str().unwrap_or("").starts_with("security-"));
         assert!(has_prefixed, "expected a label with 'security-' prefix");
     }
 }

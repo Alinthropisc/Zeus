@@ -8,12 +8,12 @@
 //!   5. Re-send REGISTER with Authorization header
 //!   6. 200 OK = success, 403/407 = failure
 
+use crate::net::TcpConnection;
 use async_trait::async_trait;
 use md5::{Digest, Md5};
 use std::time::Instant;
 use tracing::debug;
 use zeus_core::{AttackConfig, AttackResult, Credential, Protocol, Target, ZeusError};
-use crate::net::TcpConnection;
 
 use crate::resolve_addr;
 
@@ -135,9 +135,15 @@ fn status_code(response: &str) -> Option<u16> {
 
 #[async_trait]
 impl Protocol for SipProtocol {
-    fn name(&self) -> &'static str { "sip" }
-    fn default_port(&self) -> u16 { 5060 }
-    fn description(&self) -> &'static str { "SIP REGISTER Digest authentication (VoIP, RFC 3261)" }
+    fn name(&self) -> &'static str {
+        "sip"
+    }
+    fn default_port(&self) -> u16 {
+        5060
+    }
+    fn description(&self) -> &'static str {
+        "SIP REGISTER Digest authentication (VoIP, RFC 3261)"
+    }
 
     async fn authenticate(
         &self,

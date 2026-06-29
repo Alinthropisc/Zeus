@@ -188,7 +188,10 @@ impl DohResolver {
     }
 
     /// Create a resolver with a custom DoH endpoint (useful for testing).
-    pub fn with_endpoint(endpoint: impl Into<String>, prefer_ipv6: bool) -> Result<Self, reqwest::Error> {
+    pub fn with_endpoint(
+        endpoint: impl Into<String>,
+        prefer_ipv6: bool,
+    ) -> Result<Self, reqwest::Error> {
         let client = reqwest::Client::builder()
             .user_agent("zeus-research/1.0")
             .build()?;
@@ -299,7 +302,9 @@ impl DohResolver {
         for answer in answers {
             let rtype = answer.get("type").and_then(|t| t.as_u64()).unwrap_or(0);
             // Type 1 = A, Type 28 = AAAA
-            if rtype != 1 && rtype != 28 { continue; }
+            if rtype != 1 && rtype != 28 {
+                continue;
+            }
 
             if let Some(data) = answer.get("data").and_then(|d| d.as_str()) {
                 if let Ok(ip) = data.parse::<IpAddr>() {
@@ -364,14 +369,24 @@ mod tests {
     fn dns_cache_stores_result() {
         let cache = DnsCache::new(Duration::from_secs(60));
         assert!(cache.is_empty());
-        insert_fake(&cache, "example.com", "93.184.216.34".parse().unwrap(), Duration::from_secs(60));
+        insert_fake(
+            &cache,
+            "example.com",
+            "93.184.216.34".parse().unwrap(),
+            Duration::from_secs(60),
+        );
         assert_eq!(cache.len(), 1);
     }
 
     #[test]
     fn dns_cache_invalidate() {
         let cache = DnsCache::new(Duration::from_secs(60));
-        insert_fake(&cache, "example.com", "93.184.216.34".parse().unwrap(), Duration::from_secs(60));
+        insert_fake(
+            &cache,
+            "example.com",
+            "93.184.216.34".parse().unwrap(),
+            Duration::from_secs(60),
+        );
         assert_eq!(cache.len(), 1);
         cache.invalidate("example.com");
         assert_eq!(cache.len(), 0);
@@ -380,8 +395,18 @@ mod tests {
     #[test]
     fn dns_cache_clear() {
         let cache = DnsCache::new(Duration::from_secs(60));
-        insert_fake(&cache, "a.com", "1.1.1.1".parse().unwrap(), Duration::from_secs(60));
-        insert_fake(&cache, "b.com", "8.8.8.8".parse().unwrap(), Duration::from_secs(60));
+        insert_fake(
+            &cache,
+            "a.com",
+            "1.1.1.1".parse().unwrap(),
+            Duration::from_secs(60),
+        );
+        insert_fake(
+            &cache,
+            "b.com",
+            "8.8.8.8".parse().unwrap(),
+            Duration::from_secs(60),
+        );
         assert_eq!(cache.len(), 2);
         cache.clear();
         assert!(cache.is_empty());

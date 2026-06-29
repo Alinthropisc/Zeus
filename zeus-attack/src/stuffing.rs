@@ -108,7 +108,9 @@ pub struct CredentialStuffingStrategy {
 
 impl CredentialStuffingStrategy {
     pub fn from_pipeline(pipeline: CredentialStuffingPipeline) -> Self {
-        Self { credentials: pipeline.into_credentials() }
+        Self {
+            credentials: pipeline.into_credentials(),
+        }
     }
 
     pub fn from_lines(lines: impl Iterator<Item = String>, source: impl Into<String>) -> Self {
@@ -117,7 +119,9 @@ impl CredentialStuffingStrategy {
 }
 
 impl AttackStrategy for CredentialStuffingStrategy {
-    fn name(&self) -> &'static str { "credential-stuffing" }
+    fn name(&self) -> &'static str {
+        "credential-stuffing"
+    }
 
     fn credentials(&self) -> CredentialStream {
         Box::pin(iter(self.credentials.clone()))
@@ -134,7 +138,10 @@ mod tests {
     use futures::StreamExt;
 
     fn lines(raw: &[&str]) -> impl Iterator<Item = String> {
-        raw.iter().map(|s| s.to_string()).collect::<Vec<_>>().into_iter()
+        raw.iter()
+            .map(|s| s.to_string())
+            .collect::<Vec<_>>()
+            .into_iter()
     }
 
     fn pipeline(raw: &[&str]) -> CredentialStuffingPipeline {
@@ -222,13 +229,10 @@ mod tests {
 
     #[test]
     fn domain_filter_then_normalize_combined() {
-        let creds = pipeline(&[
-            "alice@example.com:pass",
-            "eve@evil.net:pass",
-        ])
-        .with_domain_filter("example.com")
-        .with_normalize_usernames(true)
-        .into_credentials();
+        let creds = pipeline(&["alice@example.com:pass", "eve@evil.net:pass"])
+            .with_domain_filter("example.com")
+            .with_normalize_usernames(true)
+            .into_credentials();
         assert_eq!(creds.len(), 1);
         assert_eq!(creds[0].username, "alice");
     }

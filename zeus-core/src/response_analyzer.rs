@@ -4,7 +4,10 @@ use std::collections::HashMap;
 #[derive(Debug, Clone)]
 pub enum EnrichedResult {
     /// Clear success — credential works.
-    Success { confidence: f64, evidence: Vec<String> },
+    Success {
+        confidence: f64,
+        evidence: Vec<String>,
+    },
     /// Clear failure.
     Failure,
     /// Password correct but MFA required — still a valuable finding!
@@ -12,13 +15,18 @@ pub enum EnrichedResult {
     /// CAPTCHA triggered — bot protection detected.
     CaptchaDetected { captcha_type: CaptchaType },
     /// Account locked out.
-    AccountLocked { lockout_duration_hint: Option<String> },
+    AccountLocked {
+        lockout_duration_hint: Option<String>,
+    },
     /// Rate limited by server.
     RateLimited { retry_after_secs: Option<u64> },
     /// WAF blocked the request.
     WafBlocked { waf_vendor: Option<String> },
     /// Unknown — needs manual review.
-    Unknown { status_code: u16, body_snippet: String },
+    Unknown {
+        status_code: u16,
+        body_snippet: String,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -138,7 +146,9 @@ impl ResponseAnalyzer {
 
         // 1. WAF detection.
         if let Some(waf) = self.detect_waf(status, headers, &body_lower) {
-            return EnrichedResult::WafBlocked { waf_vendor: Some(waf) };
+            return EnrichedResult::WafBlocked {
+                waf_vendor: Some(waf),
+            };
         }
 
         // 2. Rate limiting.
@@ -147,33 +157,42 @@ impl ResponseAnalyzer {
                 .get("retry-after")
                 .or_else(|| headers.get("x-ratelimit-reset"))
                 .and_then(|v| v.parse::<u64>().ok());
-            return EnrichedResult::RateLimited { retry_after_secs: retry_after };
+            return EnrichedResult::RateLimited {
+                retry_after_secs: retry_after,
+            };
         }
 
         // 3. Account lockout.
         if let Some(hint) = self.detect_lockout(status, &body_lower, headers) {
-            return EnrichedResult::AccountLocked { lockout_duration_hint: hint };
+            return EnrichedResult::AccountLocked {
+                lockout_duration_hint: hint,
+            };
         }
 
         // 4. CAPTCHA detection.
-        if self.detect_captcha {
-            if let Some(cap_type) = self.detect_captcha_type(&body_lower, headers) {
-                return EnrichedResult::CaptchaDetected { captcha_type: cap_type };
-            }
+        if self.detect_captcha
+            && let Some(cap_type) = self.detect_captcha_type(&body_lower, headers)
+        {
+            return EnrichedResult::CaptchaDetected {
+                captcha_type: cap_type,
+            };
         }
 
         // 5. MFA detection.
-        if self.detect_mfa {
-            if let Some(mfa) = self.detect_mfa_type(&body_lower, status, redirect_url) {
-                return EnrichedResult::MfaRequired { mfa_type: mfa };
-            }
+        if self.detect_mfa
+            && let Some(mfa) = self.detect_mfa_type(&body_lower, status, redirect_url)
+        {
+            return EnrichedResult::MfaRequired { mfa_type: mfa };
         }
 
         // 6. Success detection.
         if let Some((confidence, evidence)) =
             self.detect_success(status, body, &body_lower, redirect_url)
         {
-            return EnrichedResult::Success { confidence, evidence };
+            return EnrichedResult::Success {
+                confidence,
+                evidence,
+            };
         }
 
         // 7. Explicit failure keywords.
@@ -190,15 +209,14 @@ impl ResponseAnalyzer {
             200 => {
                 if let (Some(base_len), Some(base_status)) =
                     (self.baseline_failure_length, self.baseline_failure_status)
+                    && base_status == 200
                 {
-                    if base_status == 200 {
-                        let len_diff = (body.len() as i64 - base_len as i64).abs();
-                        if len_diff > 200 {
-                            return EnrichedResult::Success {
-                                confidence: 0.6,
-                                evidence: vec![format!("body length diff: {} bytes", len_diff)],
-                            };
-                        }
+                    let len_diff = (body.len() as i64 - base_len as i64).abs();
+                    if len_diff > 200 {
+                        return EnrichedResult::Success {
+                            confidence: 0.6,
+                            evidence: vec![format!("body length diff: {} bytes", len_diff)],
+                        };
                     }
                 }
                 EnrichedResult::Failure
@@ -243,15 +261,14 @@ impl ResponseAnalyzer {
         body_lower: &str,
     ) -> Option<String> {
         // Cloudflare
-        if headers.contains_key("cf-ray")
+        if (headers.contains_key("cf-ray")
             || headers
                 .get("server")
                 .map(|s| s.to_lowercase().contains("cloudflare"))
-                .unwrap_or(false)
+                .unwrap_or(false))
+            && (status == 403 || status == 503)
         {
-            if status == 403 || status == 503 {
-                return Some("Cloudflare".into());
-            }
+            return Some("Cloudflare".into());
         }
         // AWS WAF
         if headers.get("x-amzn-requestid").is_some() && status == 403 {
@@ -307,9 +324,7 @@ impl ResponseAnalyzer {
             } else if body_lower.contains("1 hour") {
                 Some("1 hour".into())
             } else {
-                headers
-                    .get("retry-after")
-                    .map(|v| format!("{} seconds", v))
+                headers.get("retry-after").map(|v| format!("{} seconds", v))
             };
             return Some(hint);
         }
@@ -330,8 +345,7 @@ impl ResponseAnalyzer {
         if body_lower.contains("hcaptcha.com") || body_lower.contains("h-captcha") {
             return Some(CaptchaType::HCaptcha);
         }
-        if body_lower.contains("challenges.cloudflare.com") || body_lower.contains("cf-turnstile")
-        {
+        if body_lower.contains("challenges.cloudflare.com") || body_lower.contains("cf-turnstile") {
             return Some(CaptchaType::Turnstile);
         }
         if body_lower.contains("recaptcha/api.js") || body_lower.contains("g-recaptcha") {
@@ -463,7 +477,12 @@ mod tests {
     fn analyzer_detects_rate_limit() {
         let a = ResponseAnalyzer::new();
         let r = a.analyze(429, "", &headers(&[]), None);
-        assert!(matches!(r, EnrichedResult::RateLimited { retry_after_secs: None }));
+        assert!(matches!(
+            r,
+            EnrichedResult::RateLimited {
+                retry_after_secs: None
+            }
+        ));
     }
 
     #[test]
@@ -473,7 +492,9 @@ mod tests {
         let r = a.analyze(429, "", &h, None);
         assert!(matches!(
             r,
-            EnrichedResult::RateLimited { retry_after_secs: Some(60) }
+            EnrichedResult::RateLimited {
+                retry_after_secs: Some(60)
+            }
         ));
     }
 
@@ -486,7 +507,9 @@ mod tests {
         let r = a.analyze(200, body, &headers(&[]), None);
         assert!(matches!(
             r,
-            EnrichedResult::CaptchaDetected { captcha_type: CaptchaType::ReCaptchaV2 }
+            EnrichedResult::CaptchaDetected {
+                captcha_type: CaptchaType::ReCaptchaV2
+            }
         ));
     }
 
@@ -497,18 +520,23 @@ mod tests {
         let r = a.analyze(200, body, &headers(&[]), None);
         assert!(matches!(
             r,
-            EnrichedResult::CaptchaDetected { captcha_type: CaptchaType::HCaptcha }
+            EnrichedResult::CaptchaDetected {
+                captcha_type: CaptchaType::HCaptcha
+            }
         ));
     }
 
     #[test]
     fn analyzer_detects_captcha_turnstile() {
         let a = ResponseAnalyzer::new();
-        let body = r#"<script src="https://challenges.cloudflare.com/turnstile/v0/api.js"></script>"#;
+        let body =
+            r#"<script src="https://challenges.cloudflare.com/turnstile/v0/api.js"></script>"#;
         let r = a.analyze(200, body, &headers(&[]), None);
         assert!(matches!(
             r,
-            EnrichedResult::CaptchaDetected { captcha_type: CaptchaType::Turnstile }
+            EnrichedResult::CaptchaDetected {
+                captcha_type: CaptchaType::Turnstile
+            }
         ));
     }
 
@@ -521,7 +549,9 @@ mod tests {
         let r = a.analyze(200, body, &headers(&[]), None);
         assert!(matches!(
             r,
-            EnrichedResult::MfaRequired { mfa_type: MfaType::Totp }
+            EnrichedResult::MfaRequired {
+                mfa_type: MfaType::Totp
+            }
         ));
     }
 
@@ -532,7 +562,9 @@ mod tests {
         let r = a.analyze(200, body, &headers(&[]), None);
         assert!(matches!(
             r,
-            EnrichedResult::MfaRequired { mfa_type: MfaType::Sms }
+            EnrichedResult::MfaRequired {
+                mfa_type: MfaType::Sms
+            }
         ));
     }
 

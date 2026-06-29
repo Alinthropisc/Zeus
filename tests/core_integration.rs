@@ -20,8 +20,8 @@ fn credential_construction_stores_fields() {
 
 #[test]
 fn credential_from_colon_str_valid() {
-    let cred = Credential::from_colon_str("root:toor")
-        .expect("colon-separated credential should parse");
+    let cred =
+        Credential::from_colon_str("root:toor").expect("colon-separated credential should parse");
     assert_eq!(cred.username, "root");
     assert_eq!(cred.password, "toor");
 }
@@ -97,10 +97,7 @@ fn target_with_path_builder() {
 #[test]
 fn target_with_option_builder() {
     let target = Target::new("host", 22, "ssh").with_option("timeout", "5");
-    assert_eq!(
-        target.options.get("timeout").map(String::as_str),
-        Some("5")
-    );
+    assert_eq!(target.options.get("timeout").map(String::as_str), Some("5"));
 }
 
 #[test]
@@ -227,6 +224,9 @@ async fn target_options_multiple_entries() {
         .with_option("timeout", "10")
         .with_option("retries", "3");
     assert_eq!(target.options.len(), 2);
-    assert_eq!(target.options.get("timeout").map(String::as_str), Some("10"));
+    assert_eq!(
+        target.options.get("timeout").map(String::as_str),
+        Some("10")
+    );
     assert_eq!(target.options.get("retries").map(String::as_str), Some("3"));
 }

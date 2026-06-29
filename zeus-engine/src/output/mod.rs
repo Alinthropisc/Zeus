@@ -17,21 +17,18 @@ pub mod json;
 pub mod text;
 
 // Phase 3 modules
-pub mod finding;
 pub mod builder;
-pub mod renderer;
 pub mod cvss;
-pub mod scoring;
-pub mod remediation;
+pub mod finding;
 pub mod pipeline;
+pub mod remediation;
+pub mod renderer;
+pub mod scoring;
 
 // Phase 8/9 modules
 pub mod integrations;
 
-pub use integrations::{
-    DefectDojoClient, DefectDojoConfig,
-    JiraClient, JiraConfig,
-};
+pub use integrations::{DefectDojoClient, DefectDojoConfig, JiraClient, JiraConfig};
 pub use renderer::HtmlRenderer;
 
 pub use csv::CsvWriter;
@@ -83,7 +80,9 @@ pub struct OutputManager {
 
 impl OutputManager {
     pub fn new() -> Self {
-        Self { writers: Vec::new() }
+        Self {
+            writers: Vec::new(),
+        }
     }
 
     /// Add a writer to the fan-out set.

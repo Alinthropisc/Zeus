@@ -7,8 +7,8 @@
 //! A consistent delta > 50 ms is treated as evidence of user enumeration vulnerability.
 
 use std::collections::HashMap;
-use std::time::Duration;
 use std::collections::VecDeque;
+use std::time::Duration;
 
 // ── TimingStats ───────────────────────────────────────────────────────────────
 
@@ -409,7 +409,10 @@ mod tests {
         }
 
         let result = TimingAnalysis::evaluate(&valid, &invalid, "carol", 50.0, 5);
-        assert!(result.is_none(), "should return None with insufficient samples");
+        assert!(
+            result.is_none(),
+            "should return None with insufficient samples"
+        );
     }
 
     // ── TimingOracle ──────────────────────────────────────────────────────────
@@ -451,7 +454,10 @@ mod tests {
 
         let vuln = oracle.vulnerable_usernames();
         assert!(vuln.contains(&"eve".to_string()), "eve should be flagged");
-        assert!(!vuln.contains(&"frank".to_string()), "frank should not be flagged");
+        assert!(
+            !vuln.contains(&"frank".to_string()),
+            "frank should not be flagged"
+        );
     }
 
     #[test]

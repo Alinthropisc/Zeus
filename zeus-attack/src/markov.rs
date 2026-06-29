@@ -10,17 +10,22 @@ struct Lcg {
 }
 
 impl Lcg {
-    fn new(seed: u64) -> Self { Self { state: seed } }
+    fn new(seed: u64) -> Self {
+        Self { state: seed }
+    }
 
     fn next(&mut self) -> u64 {
-        self.state = self.state
+        self.state = self
+            .state
             .wrapping_mul(6_364_136_223_846_793_005)
             .wrapping_add(1_442_695_040_888_963_407);
         self.state
     }
 
     fn next_usize(&mut self, max: usize) -> usize {
-        if max == 0 { return 0; }
+        if max == 0 {
+            return 0;
+        }
         (self.next() as usize) % max
     }
 }
@@ -54,7 +59,9 @@ impl MarkovChain {
     pub fn train(&mut self, samples: &[&str]) {
         for sample in samples {
             let chars: Vec<char> = sample.chars().collect();
-            if chars.is_empty() { continue; }
+            if chars.is_empty() {
+                continue;
+            }
 
             *self.starts.entry(chars[0]).or_insert(0) += 1;
 
@@ -74,19 +81,14 @@ impl MarkovChain {
     /// Generate `count` password candidates of lengths in `[min_len, max_len]`.
     ///
     /// Uses the LCG PRNG seeded with `seed` for deterministic output.
-    pub fn generate(
-        &self,
-        count: usize,
-        min_len: usize,
-        max_len: usize,
-        seed: u64,
-    ) -> Vec<String> {
+    pub fn generate(&self, count: usize, min_len: usize, max_len: usize, seed: u64) -> Vec<String> {
         let mut rng = Lcg::new(seed);
         let mut results = Vec::with_capacity(count);
 
-        let start_chars: Vec<(char, u32)> =
-            self.starts.iter().map(|(c, w)| (*c, *w)).collect();
-        if start_chars.is_empty() { return results; }
+        let start_chars: Vec<(char, u32)> = self.starts.iter().map(|(c, w)| (*c, *w)).collect();
+        if start_chars.is_empty() {
+            return results;
+        }
 
         let total_start: u32 = start_chars.iter().map(|(_, w)| w).sum();
         let len_range = max_len.saturating_sub(min_len);
@@ -101,7 +103,10 @@ impl MarkovChain {
             let mut current = start_chars[0].0;
             for (c, w) in &start_chars {
                 acc += w;
-                if roll < acc { current = *c; break; }
+                if roll < acc {
+                    current = *c;
+                    break;
+                }
             }
             password.push(current);
 
@@ -122,12 +127,17 @@ impl MarkovChain {
 
                 if let Some(nexts) = self.transitions.get(&state) {
                     let total: u32 = nexts.iter().map(|(_, w)| w).sum();
-                    if total == 0 { break; }
+                    if total == 0 {
+                        break;
+                    }
                     let roll = (rng.next() % total as u64) as u32;
                     let mut acc = 0u32;
                     for (c, w) in nexts {
                         acc += w;
-                        if roll < acc { password.push(*c); break; }
+                        if roll < acc {
+                            password.push(*c);
+                            break;
+                        }
                     }
                 } else {
                     break;
@@ -145,13 +155,41 @@ impl MarkovChain {
     pub fn english_common() -> Self {
         let mut chain = Self::new(1);
         chain.train(&[
-            "password", "qwerty", "letmein", "dragon", "master",
-            "monkey", "shadow", "sunshine", "princess", "welcome",
-            "football", "baseball", "superman", "batman", "batman1",
-            "hello", "hello1", "iloveyou", "trustno1", "starwars",
-            "passw0rd", "password1", "abc123", "111111", "123456",
-            "michael", "jessica", "access", "ranger", "hunter",
-            "buster", "thomas", "robert", "hockey", "killer",
+            "password",
+            "qwerty",
+            "letmein",
+            "dragon",
+            "master",
+            "monkey",
+            "shadow",
+            "sunshine",
+            "princess",
+            "welcome",
+            "football",
+            "baseball",
+            "superman",
+            "batman",
+            "batman1",
+            "hello",
+            "hello1",
+            "iloveyou",
+            "trustno1",
+            "starwars",
+            "passw0rd",
+            "password1",
+            "abc123",
+            "111111",
+            "123456",
+            "michael",
+            "jessica",
+            "access",
+            "ranger",
+            "hunter",
+            "buster",
+            "thomas",
+            "robert",
+            "hockey",
+            "killer",
         ]);
         chain
     }
@@ -199,11 +237,14 @@ impl MarkovStrategy {
 }
 
 impl AttackStrategy for MarkovStrategy {
-    fn name(&self) -> &'static str { "markov" }
+    fn name(&self) -> &'static str {
+        "markov"
+    }
 
     fn credentials(&self) -> CredentialStream {
-        let passwords =
-            self.chain.generate(self.count, self.min_len, self.max_len, self.seed);
+        let passwords = self
+            .chain
+            .generate(self.count, self.min_len, self.max_len, self.seed);
         let username = self.username.clone();
         let creds: Vec<Credential> = passwords
             .into_iter()

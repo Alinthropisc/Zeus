@@ -10,8 +10,12 @@ pub struct SshKeyProtocol;
 
 #[async_trait]
 impl Protocol for SshKeyProtocol {
-    fn name(&self) -> &'static str { "ssh-key" }
-    fn default_port(&self) -> u16 { 22 }
+    fn name(&self) -> &'static str {
+        "ssh-key"
+    }
+    fn default_port(&self) -> u16 {
+        22
+    }
     fn description(&self) -> &'static str {
         "SSH-2 public-key authentication (stub — russh not available)"
     }
@@ -22,7 +26,9 @@ impl Protocol for SshKeyProtocol {
         _cred: &Credential,
         _config: &AttackConfig,
     ) -> Result<AttackResult, ZeusError> {
-        Err(ZeusError::Protocol("SSH key support requires the russh crate which is not compiled into this build".into()))
+        Err(ZeusError::Protocol(
+            "SSH key support requires the russh crate which is not compiled into this build".into(),
+        ))
     }
 }
 

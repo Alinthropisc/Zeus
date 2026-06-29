@@ -12,22 +12,22 @@
 //! requires a server challenge round-trip.  For simplicity we send an auth start and
 //! detect ORA-01017 (invalid username/password) vs. a non-error response.
 
+use crate::net::TcpConnection;
 use async_trait::async_trait;
 use std::net::ToSocketAddrs;
 use std::time::Instant;
 use tracing::debug;
 use zeus_core::{AttackConfig, AttackResult, Credential, Protocol, Target, ZeusError};
-use crate::net::TcpConnection;
 
 pub struct OracleProtocol;
 
 // ── TNS packet types ──────────────────────────────────────────────────────────
 
-const TNS_TYPE_CONNECT:  u8 = 1;
-const TNS_TYPE_ACCEPT:   u8 = 2;
-const TNS_TYPE_REFUSE:   u8 = 4;
+const TNS_TYPE_CONNECT: u8 = 1;
+const TNS_TYPE_ACCEPT: u8 = 2;
+const TNS_TYPE_REFUSE: u8 = 4;
 const TNS_TYPE_REDIRECT: u8 = 5;
-const TNS_TYPE_DATA:     u8 = 6;
+const TNS_TYPE_DATA: u8 = 6;
 // const TNS_TYPE_RESEND:   u8 = 11;  // unused here but noted
 
 /// Size of the TNS packet header in bytes.
@@ -38,16 +38,16 @@ const TNS_TYPE_OFFSET: usize = 4;
 
 // ── TNS CONNECT fixed-header fields (big-endian unless noted) ────────────────
 
-const TNS_CONNECT_VERSION:        u16 = 0x013A; // 314 — Oracle 12.1
+const TNS_CONNECT_VERSION: u16 = 0x013A; // 314 — Oracle 12.1
 const TNS_CONNECT_VERSION_COMPAT: u16 = 0x0134; // 308
-const TNS_SERVICE_OPTIONS:        u16 = 0x0C41;
-const TNS_SDU:                    u16 = 0x0800; // 2048
-const TNS_TDU:                    u16 = 0x7FFF; // 32767
-const TNS_NT_PROTOCOL:            u16 = 0x0000;
-const TNS_LINE_TURNAROUND:        u16 = 0x0000;
-const TNS_VALUE_OF_ONE:           u16 = 0x0001;
-const TNS_MAX_RECV_CONNECT:       u32 = 512;
-const TNS_CONNECT_FLAGS:          u8  = 0x04;
+const TNS_SERVICE_OPTIONS: u16 = 0x0C41;
+const TNS_SDU: u16 = 0x0800; // 2048
+const TNS_TDU: u16 = 0x7FFF; // 32767
+const TNS_NT_PROTOCOL: u16 = 0x0000;
+const TNS_LINE_TURNAROUND: u16 = 0x0000;
+const TNS_VALUE_OF_ONE: u16 = 0x0001;
+const TNS_MAX_RECV_CONNECT: u32 = 512;
+const TNS_CONNECT_FLAGS: u8 = 0x04;
 
 /// Size of the CONNECT body fixed fields (before the connect data string).
 /// version(2)+compat(2)+svc_opts(2)+sdu(2)+tdu(2)+nt_proto(2)+line_ta(2)+val1(2)
@@ -69,11 +69,11 @@ const TNS_CONNECT_DATA_OFFSET: u16 = (TNS_HDR_LEN + TNS_CONNECT_FIXED_LEN) as u1
 fn tns_packet(pkt_type: u8, body: &[u8]) -> Vec<u8> {
     let total = (TNS_HDR_LEN + body.len()) as u16;
     let mut pkt = Vec::with_capacity(TNS_HDR_LEN + body.len());
-    pkt.extend_from_slice(&total.to_be_bytes());   // length
-    pkt.extend_from_slice(&0u16.to_be_bytes());    // checksum
-    pkt.push(pkt_type);                            // type
-    pkt.push(0x00);                                // reserved
-    pkt.extend_from_slice(&0u16.to_be_bytes());    // header checksum
+    pkt.extend_from_slice(&total.to_be_bytes()); // length
+    pkt.extend_from_slice(&0u16.to_be_bytes()); // checksum
+    pkt.push(pkt_type); // type
+    pkt.push(0x00); // reserved
+    pkt.extend_from_slice(&0u16.to_be_bytes()); // header checksum
     pkt.extend_from_slice(body);
     pkt
 }
@@ -95,8 +95,8 @@ fn build_tns_connect_body(connect_data: &[u8]) -> Vec<u8> {
     body.extend_from_slice(&data_len.to_be_bytes());
     body.extend_from_slice(&TNS_CONNECT_DATA_OFFSET.to_be_bytes());
     body.extend_from_slice(&TNS_MAX_RECV_CONNECT.to_be_bytes());
-    body.push(TNS_CONNECT_FLAGS);   // connect_flags_0
-    body.push(TNS_CONNECT_FLAGS);   // connect_flags_1
+    body.push(TNS_CONNECT_FLAGS); // connect_flags_0
+    body.push(TNS_CONNECT_FLAGS); // connect_flags_1
     body.extend_from_slice(connect_data);
 
     body
@@ -152,7 +152,9 @@ fn build_auth_start(username: &str) -> Vec<u8> {
 /// Read one TNS packet from the connection.  Returns the entire packet including
 /// the 8-byte header.
 async fn read_tns_packet(conn: &mut TcpConnection) -> Result<Vec<u8>, ZeusError> {
-    let header = conn.read_bytes(TNS_HDR_LEN).await
+    let header = conn
+        .read_bytes(TNS_HDR_LEN)
+        .await
         .map_err(|e| ZeusError::Protocol(format!("TNS: header read failed: {e}")))?;
 
     if header.len() < TNS_HDR_LEN {
@@ -166,7 +168,8 @@ async fn read_tns_packet(conn: &mut TcpConnection) -> Result<Vec<u8>, ZeusError>
 
     let body_len = total_len - TNS_HDR_LEN;
     let body = if body_len > 0 {
-        conn.read_bytes(body_len).await
+        conn.read_bytes(body_len)
+            .await
             .map_err(|e| ZeusError::Protocol(format!("TNS: body read failed: {e}")))?
     } else {
         vec![]
@@ -187,8 +190,12 @@ fn contains_ora_01017(data: &[u8]) -> bool {
 
 #[async_trait]
 impl Protocol for OracleProtocol {
-    fn name(&self) -> &'static str { "oracle" }
-    fn default_port(&self) -> u16 { 1521 }
+    fn name(&self) -> &'static str {
+        "oracle"
+    }
+    fn default_port(&self) -> u16 {
+        1521
+    }
     fn description(&self) -> &'static str {
         "Oracle TNS raw wire protocol (Connect/Accept + auth start probe)"
     }
@@ -208,7 +215,8 @@ impl Protocol for OracleProtocol {
             .ok_or_else(|| ZeusError::Protocol("DNS resolution failed".into()))?;
 
         let start = Instant::now();
-        let mut conn = TcpConnection::connect(addr, config.timeout).await
+        let mut conn = TcpConnection::connect(addr, config.timeout)
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
 
         let service = target.path.as_deref().unwrap_or("XE");
@@ -217,8 +225,9 @@ impl Protocol for OracleProtocol {
 
         // ── Step 1: TNS CONNECT ────────────────────────────────────────────
         let connect_body = build_tns_connect_body(desc.as_bytes());
-        let connect_pkt  = tns_packet(TNS_TYPE_CONNECT, &connect_body);
-        conn.write_all(&connect_pkt).await
+        let connect_pkt = tns_packet(TNS_TYPE_CONNECT, &connect_body);
+        conn.write_all(&connect_pkt)
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
         debug!("Oracle: sent TNS CONNECT ({} bytes)", connect_pkt.len());
 
@@ -251,21 +260,25 @@ impl Protocol for OracleProtocol {
             }
             other => {
                 let _ = conn.shutdown().await;
-                return Ok(AttackResult::Error(
-                    format!("Oracle: unexpected TNS response type {}", other),
-                ));
+                return Ok(AttackResult::Error(format!(
+                    "Oracle: unexpected TNS response type {}",
+                    other
+                )));
             }
         }
 
         // ── Step 3: send auth start ────────────────────────────────────────
         let auth_pkt = build_auth_start(&cred.username);
-        conn.write_all(&auth_pkt).await
+        conn.write_all(&auth_pkt)
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
         debug!("Oracle: sent auth start");
 
         // ── Step 4: read auth response ─────────────────────────────────────
         // Drain whatever the server sends back (may be challenge or error).
-        let auth_resp = conn.read_available().await
+        let auth_resp = conn
+            .read_available()
+            .await
             .map_err(|e| ZeusError::Protocol(format!("Oracle: auth read error: {e}")))?;
         let _ = conn.shutdown().await;
 
@@ -320,7 +333,7 @@ mod tests {
     fn tns_packet_minimum_length() {
         let descriptor = connect_descriptor("192.168.1.1", 1521, "orcl");
         let body = build_tns_connect_body(descriptor.as_bytes());
-        let pkt  = tns_packet(TNS_TYPE_CONNECT, &body);
+        let pkt = tns_packet(TNS_TYPE_CONNECT, &body);
         // Must be at least 58 bytes (8 header + 28 fixed body + some connect data)
         assert!(
             pkt.len() >= 58,
@@ -332,7 +345,7 @@ mod tests {
     #[test]
     fn tns_packet_length_field_is_accurate() {
         let body = build_tns_connect_body(b"test");
-        let pkt  = tns_packet(TNS_TYPE_CONNECT, &body);
+        let pkt = tns_packet(TNS_TYPE_CONNECT, &body);
         let reported = u16::from_be_bytes([pkt[0], pkt[1]]) as usize;
         assert_eq!(reported, pkt.len());
     }
@@ -355,8 +368,14 @@ mod tests {
     #[test]
     fn connect_descriptor_contains_service_name() {
         let desc = connect_descriptor("localhost", 1521, "mydb");
-        assert!(desc.contains("mydb"), "descriptor must include the service name");
-        assert!(desc.contains("localhost"), "descriptor must include the host");
+        assert!(
+            desc.contains("mydb"),
+            "descriptor must include the service name"
+        );
+        assert!(
+            desc.contains("localhost"),
+            "descriptor must include the host"
+        );
     }
 
     #[test]

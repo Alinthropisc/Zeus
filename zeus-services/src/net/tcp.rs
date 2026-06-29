@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use bytes::BytesMut;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -6,8 +6,8 @@ use std::time::Duration;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio::time::timeout;
-use tokio_rustls::rustls::{ClientConfig, RootCertStore};
 use tokio_rustls::TlsConnector;
+use tokio_rustls::rustls::{ClientConfig, RootCertStore};
 use tracing::debug;
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -24,7 +24,10 @@ impl TcpConnection {
         let stream = timeout(connect_timeout, TcpStream::connect(addr)).await??;
         stream.set_nodelay(true)?;
         debug!("TCP connected to {}", addr);
-        Ok(Self { stream, timeout: connect_timeout })
+        Ok(Self {
+            stream,
+            timeout: connect_timeout,
+        })
     }
 
     // ── writes ────────────────────────────────────────────────────────────────
@@ -143,7 +146,10 @@ impl TlsConnection {
 
         let stream = timeout(connect_timeout, connector.connect(server_name, tcp)).await??;
         debug!("TLS connected to {}:{}", host, port);
-        Ok(Self { stream, timeout: connect_timeout })
+        Ok(Self {
+            stream,
+            timeout: connect_timeout,
+        })
     }
 
     // ── writes ────────────────────────────────────────────────────────────────
@@ -240,7 +246,11 @@ impl TcpConnection {
     /// The returned buffer contains all bytes read including the pattern (if
     /// found).  If `max_bytes` is reached before the pattern, the truncated
     /// buffer is returned without error.
-    pub async fn read_until_pattern(&mut self, pattern: &[u8], max_bytes: usize) -> Result<Vec<u8>> {
+    pub async fn read_until_pattern(
+        &mut self,
+        pattern: &[u8],
+        max_bytes: usize,
+    ) -> Result<Vec<u8>> {
         let mut buf = Vec::with_capacity(512.min(max_bytes));
         let mut tmp = [0u8; 256];
         loop {
@@ -322,7 +332,10 @@ impl TcpConnection {
             timeout(timeout_dur, connector.connect(server_name, self.stream)).await??;
 
         debug!("STARTTLS upgrade completed for {}", hostname);
-        Ok(TlsConnection { stream: tls_stream, timeout: timeout_dur })
+        Ok(TlsConnection {
+            stream: tls_stream,
+            timeout: timeout_dur,
+        })
     }
 }
 

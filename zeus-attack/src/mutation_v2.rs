@@ -30,7 +30,9 @@ pub trait MutationRule: Send + Sync {
 pub struct YearSuffixRule;
 
 impl MutationRule for YearSuffixRule {
-    fn name(&self) -> &'static str { "year-suffix" }
+    fn name(&self) -> &'static str {
+        "year-suffix"
+    }
 
     fn apply(&self, base: &str, ctx: &TargetContext) -> Vec<String> {
         let y = ctx.year;
@@ -45,7 +47,9 @@ impl MutationRule for YearSuffixRule {
 pub struct SpecialCharRule;
 
 impl MutationRule for SpecialCharRule {
-    fn name(&self) -> &'static str { "special-char" }
+    fn name(&self) -> &'static str {
+        "special-char"
+    }
 
     fn apply(&self, base: &str, _ctx: &TargetContext) -> Vec<String> {
         let cap = capitalize(base);
@@ -63,7 +67,9 @@ impl MutationRule for SpecialCharRule {
 pub struct LeetSpeakRule;
 
 impl MutationRule for LeetSpeakRule {
-    fn name(&self) -> &'static str { "leet-speak" }
+    fn name(&self) -> &'static str {
+        "leet-speak"
+    }
 
     fn apply(&self, base: &str, _ctx: &TargetContext) -> Vec<String> {
         // a→@, e→3, i→1, o→0, s→$
@@ -74,7 +80,13 @@ impl MutationRule for LeetSpeakRule {
         for &(from, to) in subs {
             let variant = base
                 .chars()
-                .map(|c| if c.to_ascii_lowercase() == from { to } else { c })
+                .map(|c| {
+                    if c.to_ascii_lowercase() == from {
+                        to
+                    } else {
+                        c
+                    }
+                })
                 .collect::<String>();
             if variant != base {
                 results.insert(variant);
@@ -104,7 +116,9 @@ impl MutationRule for LeetSpeakRule {
 pub struct CompanyContextRule;
 
 impl MutationRule for CompanyContextRule {
-    fn name(&self) -> &'static str { "company-context" }
+    fn name(&self) -> &'static str {
+        "company-context"
+    }
 
     fn apply(&self, base: &str, ctx: &TargetContext) -> Vec<String> {
         let Some(company) = &ctx.company else {
@@ -124,7 +138,9 @@ impl MutationRule for CompanyContextRule {
 pub struct KeyboardWalkRule;
 
 impl MutationRule for KeyboardWalkRule {
-    fn name(&self) -> &'static str { "keyboard-walk" }
+    fn name(&self) -> &'static str {
+        "keyboard-walk"
+    }
 
     fn apply(&self, base: &str, _ctx: &TargetContext) -> Vec<String> {
         vec![
@@ -139,7 +155,9 @@ impl MutationRule for KeyboardWalkRule {
 pub struct CaseMixRule;
 
 impl MutationRule for CaseMixRule {
-    fn name(&self) -> &'static str { "case-mix" }
+    fn name(&self) -> &'static str {
+        "case-mix"
+    }
 
     fn apply(&self, base: &str, _ctx: &TargetContext) -> Vec<String> {
         let cap = capitalize(base);
@@ -209,7 +227,9 @@ impl MutationEngineV2 {
 }
 
 impl AttackStrategy for MutationEngineV2 {
-    fn name(&self) -> &'static str { "mutation-v2" }
+    fn name(&self) -> &'static str {
+        "mutation-v2"
+    }
 
     fn credentials(&self) -> CredentialStream {
         let mutations = self.generate();
@@ -363,7 +383,10 @@ mod tests {
     #[test]
     fn year_suffix_rule_generates_year_variants() {
         let rule = YearSuffixRule;
-        let ctx = TargetContext { year: 2024, ..Default::default() };
+        let ctx = TargetContext {
+            year: 2024,
+            ..Default::default()
+        };
         let results = rule.apply("pass", &ctx);
         assert!(results.contains(&"pass2024".to_owned()));
         assert!(results.contains(&"pass2023".to_owned()));
@@ -376,7 +399,11 @@ mod tests {
         let ctx = TargetContext::default();
         let results = rule.apply("base", &ctx);
         // b@se (a→@) or b4s3 (all-at-once) should be present
-        assert!(results.iter().any(|r| r.contains('@') || r.contains('3') || r.contains('$')));
+        assert!(
+            results
+                .iter()
+                .any(|r| r.contains('@') || r.contains('3') || r.contains('$'))
+        );
     }
 
     #[test]
@@ -413,7 +440,10 @@ mod tests {
         // Keyboard walk
         assert!(mutations.contains(&"admin123".to_owned()));
         // Company context
-        assert!(mutations.contains(&"corpAdmin".to_owned()) || mutations.contains(&"corpadmin".to_owned()));
+        assert!(
+            mutations.contains(&"corpAdmin".to_owned())
+                || mutations.contains(&"corpadmin".to_owned())
+        );
     }
 
     #[test]
@@ -421,7 +451,9 @@ mod tests {
         // Two rules that would produce the same output get deduplicated.
         struct ConstRule;
         impl MutationRule for ConstRule {
-            fn name(&self) -> &'static str { "const" }
+            fn name(&self) -> &'static str {
+                "const"
+            }
             fn apply(&self, _base: &str, _ctx: &TargetContext) -> Vec<String> {
                 vec!["duplicate".to_owned(), "duplicate".to_owned()]
             }
@@ -433,7 +465,10 @@ mod tests {
             .add_rule(Box::new(ConstRule))
             .build();
         let mutations = engine.generate();
-        let count = mutations.iter().filter(|m| m.as_str() == "duplicate").count();
+        let count = mutations
+            .iter()
+            .filter(|m| m.as_str() == "duplicate")
+            .count();
         assert_eq!(count, 1);
     }
 
@@ -452,7 +487,9 @@ mod tests {
     fn custom_rule_plugged_in() {
         struct PrefixRule;
         impl MutationRule for PrefixRule {
-            fn name(&self) -> &'static str { "prefix" }
+            fn name(&self) -> &'static str {
+                "prefix"
+            }
             fn apply(&self, base: &str, _ctx: &TargetContext) -> Vec<String> {
                 vec![format!("custom_{}", base)]
             }

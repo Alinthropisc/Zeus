@@ -11,7 +11,7 @@ pub mod resolver;
 pub mod tcp;
 
 pub use connection::ConnectionPool;
-pub use dns::{global_dns_cache, DnsCache};
+pub use dns::{DnsCache, global_dns_cache};
 pub use http_client::{HttpClient, HttpClientBuilder};
 pub use proxy::{ProxyConfig, ProxyType};
 pub use rate_limiter::{GlobalRateLimiter, RateLimiter};

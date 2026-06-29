@@ -26,12 +26,12 @@
 //!
 //! Login uses function 23, subfunction 20 ("Login to File Server").
 
+use crate::net::TcpConnection;
 use async_trait::async_trait;
 use std::net::ToSocketAddrs;
 use std::time::Instant;
 use tracing::debug;
 use zeus_core::{AttackConfig, AttackResult, Credential, Protocol, Target, ZeusError};
-use crate::net::TcpConnection;
 
 // ── NCP constants ─────────────────────────────────────────────────────────────
 
@@ -58,12 +58,12 @@ const NCP_SUBFUNC_LOGIN: u8 = 20;
 fn build_ncp_connect_request(sequence: u8) -> Vec<u8> {
     let mut pkt = Vec::with_capacity(24);
     pkt.extend_from_slice(&NCP_REQUEST_MARKER); // request type
-    pkt.push(sequence);                          // sequence number
-    pkt.push(0xFF);                              // connection low (0xFF = create)
-    pkt.push(0x00);                              // task number
-    pkt.push(0xFF);                              // connection high (0xFF = create)
-    pkt.push(0x00);                              // function code (0 = connect)
-    pkt.push(0x00);                              // reserved
+    pkt.push(sequence); // sequence number
+    pkt.push(0xFF); // connection low (0xFF = create)
+    pkt.push(0x00); // task number
+    pkt.push(0xFF); // connection high (0xFF = create)
+    pkt.push(0x00); // function code (0 = connect)
+    pkt.push(0x00); // reserved
     // Pad to 24 bytes
     pkt.resize(24, 0x00);
     pkt
@@ -75,8 +75,12 @@ pub struct NcpProtocol;
 
 #[async_trait]
 impl Protocol for NcpProtocol {
-    fn name(&self) -> &'static str { "ncp" }
-    fn default_port(&self) -> u16 { 524 }
+    fn name(&self) -> &'static str {
+        "ncp"
+    }
+    fn default_port(&self) -> u16 {
+        524
+    }
     fn description(&self) -> &'static str {
         "Novell NetWare NCP file server authentication (partial — handshake probe only)"
     }
@@ -116,7 +120,11 @@ impl Protocol for NcpProtocol {
 
         // Check for the NCP reply marker (bytes 0-1 = 0x12 0x34).
         let has_ncp_reply = resp.len() >= 2 && resp[0..2] == NCP_REPLY_MARKER;
-        debug!("NCP: response len={} ncp_reply={}", resp.len(), has_ncp_reply);
+        debug!(
+            "NCP: response len={} ncp_reply={}",
+            resp.len(),
+            has_ncp_reply
+        );
 
         // ── Step 3: report partial implementation ─────────────────────────────
         // Full NCP authentication requires:

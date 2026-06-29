@@ -44,7 +44,9 @@ pub struct AttackConfigBuilder {
 }
 
 impl AttackConfigBuilder {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
     pub fn concurrency(mut self, n: usize) -> Self {
         self.inner.concurrency = n;
         self.inner.max_tasks = n;
@@ -55,9 +57,18 @@ impl AttackConfigBuilder {
         self.inner.concurrency = n;
         self
     }
-    pub fn timeout(mut self, d: Duration) -> Self { self.inner.timeout = d; self }
-    pub fn retry_count(mut self, n: u32) -> Self { self.inner.retry_count = n; self }
-    pub fn retry_delay(mut self, d: Duration) -> Self { self.inner.retry_delay = d; self }
+    pub fn timeout(mut self, d: Duration) -> Self {
+        self.inner.timeout = d;
+        self
+    }
+    pub fn retry_count(mut self, n: u32) -> Self {
+        self.inner.retry_count = n;
+        self
+    }
+    pub fn retry_delay(mut self, d: Duration) -> Self {
+        self.inner.retry_delay = d;
+        self
+    }
     pub fn exit_on_first(mut self, v: bool) -> Self {
         self.inner.exit_on_first = v;
         self.inner.stop_on_first = v;
@@ -68,11 +79,25 @@ impl AttackConfigBuilder {
         self.inner.exit_on_first = v;
         self
     }
-    pub fn rate_limit(mut self, rps: u64) -> Self { self.inner.rate_limit = Some(rps); self }
-    pub fn verbose(mut self, v: bool) -> Self { self.inner.verbose = v; self }
-    pub fn target_rps(mut self, rps: u64) -> Self { self.inner.target_rps = rps; self }
-    pub fn max_retries(mut self, n: u32) -> Self { self.inner.max_retries = n; self }
-    pub fn build(self) -> AttackConfig { self.inner }
+    pub fn rate_limit(mut self, rps: u64) -> Self {
+        self.inner.rate_limit = Some(rps);
+        self
+    }
+    pub fn verbose(mut self, v: bool) -> Self {
+        self.inner.verbose = v;
+        self
+    }
+    pub fn target_rps(mut self, rps: u64) -> Self {
+        self.inner.target_rps = rps;
+        self
+    }
+    pub fn max_retries(mut self, n: u32) -> Self {
+        self.inner.max_retries = n;
+        self
+    }
+    pub fn build(self) -> AttackConfig {
+        self.inner
+    }
 }
 
 #[cfg(test)]
@@ -90,7 +115,10 @@ mod tests {
 
     #[test]
     fn builder_override() {
-        let cfg = AttackConfigBuilder::new().concurrency(4).verbose(true).build();
+        let cfg = AttackConfigBuilder::new()
+            .concurrency(4)
+            .verbose(true)
+            .build();
         assert_eq!(cfg.concurrency, 4);
         assert_eq!(cfg.max_tasks, 4);
         assert!(cfg.verbose);

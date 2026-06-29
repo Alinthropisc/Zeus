@@ -36,7 +36,9 @@ pub mod strategy;
 pub use checkpoint::{AttackCheckpoint, CheckpointManager};
 pub use multi_engine::{MultiAttackResult, MultiEngine};
 pub use priority::PriorityStrategy;
-pub use session::{AttackSession, LegacySession, LegacyStatus, SessionState, SessionStats, SessionStatus};
+pub use session::{
+    AttackSession, LegacySession, LegacyStatus, SessionState, SessionStats, SessionStatus,
+};
 pub use strategy::{DispatchStrategy, SequentialStrategy, StopOnFirstStrategy};
 
 use futures::stream::StreamExt;
@@ -49,7 +51,9 @@ use tokio::task::JoinSet;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info, warn};
 use zeus_attack::AttackStrategy;
-use zeus_core::{AttackConfig, AttackResult, Credential, Protocol, ProgressEvent, Target, ZeusError};
+use zeus_core::{
+    AttackConfig, AttackResult, Credential, ProgressEvent, Protocol, Target, ZeusError,
+};
 use zeus_services::registry::ProtocolRegistry;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -59,23 +63,23 @@ use zeus_services::registry::ProtocolRegistry;
 /// Groups all per-session atomic counters so they can be passed as a single
 /// `Arc` rather than six separate `Arc<AtomicU64>` values.
 struct SessionCounters {
-    attempts:    AtomicU64,
-    successes:   AtomicU64,
-    failures:    AtomicU64,
-    errors:      AtomicU64,
+    attempts: AtomicU64,
+    successes: AtomicU64,
+    failures: AtomicU64,
+    errors: AtomicU64,
     rate_limits: AtomicU64,
-    timeouts:    AtomicU64,
+    timeouts: AtomicU64,
 }
 
 impl SessionCounters {
     fn new() -> Self {
         Self {
-            attempts:    AtomicU64::new(0),
-            successes:   AtomicU64::new(0),
-            failures:    AtomicU64::new(0),
-            errors:      AtomicU64::new(0),
+            attempts: AtomicU64::new(0),
+            successes: AtomicU64::new(0),
+            failures: AtomicU64::new(0),
+            errors: AtomicU64::new(0),
             rate_limits: AtomicU64::new(0),
-            timeouts:    AtomicU64::new(0),
+            timeouts: AtomicU64::new(0),
         }
     }
 }
@@ -89,14 +93,14 @@ impl SessionCounters {
 /// All fields are individually `Arc`-wrapped or `Clone`, so the struct itself
 /// is cheap to clone across task boundaries.
 struct WorkerContext {
-    proto:             Arc<dyn Protocol>,
-    target:            Target,
-    config:            AttackConfig,
-    tx:                broadcast::Sender<ProgressEvent>,
-    counters:          Arc<SessionCounters>,
-    found:             Arc<parking_lot::Mutex<Vec<Credential>>>,
-    cancel:            CancellationToken,
-    paused:            Arc<AtomicBool>,
+    proto: Arc<dyn Protocol>,
+    target: Target,
+    config: AttackConfig,
+    tx: broadcast::Sender<ProgressEvent>,
+    counters: Arc<SessionCounters>,
+    found: Arc<parking_lot::Mutex<Vec<Credential>>>,
+    cancel: CancellationToken,
+    paused: Arc<AtomicBool>,
     dispatch_strategy: Arc<dyn DispatchStrategy>,
 }
 
@@ -109,10 +113,10 @@ struct WorkerContext {
 /// The engine is **open for extension** via [`DispatchStrategy`] and
 /// [`AttackStrategy`] without modifying this struct (OCP).
 pub struct Engine {
-    registry:          Arc<ProtocolRegistry>,
-    config:            AttackConfig,
+    registry: Arc<ProtocolRegistry>,
+    config: AttackConfig,
     /// Pause flag — worker tasks spin-wait while this is `true`.
-    paused:            Arc<AtomicBool>,
+    paused: Arc<AtomicBool>,
     /// Controls early-stop semantics; defaults to [`SequentialStrategy`].
     dispatch_strategy: Arc<dyn DispatchStrategy>,
 }
@@ -123,7 +127,7 @@ impl Engine {
         Self {
             registry,
             config,
-            paused:            Arc::new(AtomicBool::new(false)),
+            paused: Arc::new(AtomicBool::new(false)),
             dispatch_strategy: Arc::new(SequentialStrategy),
         }
     }
@@ -141,13 +145,19 @@ impl Engine {
     }
 
     /// Pause all in-flight workers (they spin-wait until resumed).
-    pub fn pause(&self) { self.paused.store(true, Ordering::Relaxed); }
+    pub fn pause(&self) {
+        self.paused.store(true, Ordering::Relaxed);
+    }
 
     /// Resume paused workers.
-    pub fn resume(&self) { self.paused.store(false, Ordering::Relaxed); }
+    pub fn resume(&self) {
+        self.paused.store(false, Ordering::Relaxed);
+    }
 
     /// Returns `true` if the engine is currently paused.
-    pub fn is_paused(&self) -> bool { self.paused.load(Ordering::Relaxed) }
+    pub fn is_paused(&self) -> bool {
+        self.paused.load(Ordering::Relaxed)
+    }
 
     /// Run an attack against `target` using the given credential `strategy`.
     ///
@@ -171,14 +181,14 @@ impl Engine {
         };
 
         let _ = tx.send(ProgressEvent::SessionStarted {
-            target:          target.clone(),
+            target: target.clone(),
             estimated_total: estimated,
         });
 
-        let cancel   = CancellationToken::new();
+        let cancel = CancellationToken::new();
         let counters = Arc::new(SessionCounters::new());
-        let found    = Arc::new(parking_lot::Mutex::new(Vec::<Credential>::new()));
-        let start    = Instant::now();
+        let found = Arc::new(parking_lot::Mutex::new(Vec::<Credential>::new()));
+        let start = Instant::now();
 
         run_scheduler(
             proto,
@@ -192,12 +202,17 @@ impl Engine {
             Arc::clone(&self.paused),
             Arc::clone(&self.dispatch_strategy),
             start,
-        ).await;
+        )
+        .await;
 
         emit_session_finished(&tx, &counters, &found, start);
 
         let found_creds = std::mem::take(&mut *found.lock());
-        info!(attempts = counters.attempts.load(Ordering::Relaxed), found = found_creds.len(), "session finished");
+        info!(
+            attempts = counters.attempts.load(Ordering::Relaxed),
+            found = found_creds.len(),
+            "session finished"
+        );
 
         (found_creds, rx)
     }
@@ -214,20 +229,20 @@ impl Engine {
 /// counter updates — those live in the worker.
 #[allow(clippy::too_many_arguments)]
 async fn run_scheduler(
-    proto:             Arc<dyn Protocol>,
-    target:            Target,
-    attack_strategy:   Box<dyn AttackStrategy>,
-    config:            AttackConfig,
-    tx:                broadcast::Sender<ProgressEvent>,
-    cancel:            CancellationToken,
-    counters:          Arc<SessionCounters>,
-    found:             Arc<parking_lot::Mutex<Vec<Credential>>>,
-    paused:            Arc<AtomicBool>,
+    proto: Arc<dyn Protocol>,
+    target: Target,
+    attack_strategy: Box<dyn AttackStrategy>,
+    config: AttackConfig,
+    tx: broadcast::Sender<ProgressEvent>,
+    cancel: CancellationToken,
+    counters: Arc<SessionCounters>,
+    found: Arc<parking_lot::Mutex<Vec<Credential>>>,
+    paused: Arc<AtomicBool>,
     dispatch_strategy: Arc<dyn DispatchStrategy>,
-    start:             Instant,
+    start: Instant,
 ) {
-    let semaphore   = Arc::new(tokio::sync::Semaphore::new(config.max_tasks));
-    let mut stream  = attack_strategy.credentials();
+    let semaphore = Arc::new(tokio::sync::Semaphore::new(config.max_tasks));
+    let mut stream = attack_strategy.credentials();
     let mut join_set: JoinSet<()> = JoinSet::new();
     let mut dispatched: u64 = 0;
 
@@ -240,24 +255,27 @@ async fn run_scheduler(
         throttle_rps(&config, &mut dispatched, start).await;
 
         let permit = match semaphore.clone().acquire_owned().await {
-            Ok(p)  => p,
-            Err(_) => { warn!("semaphore closed — stopping early"); break; }
+            Ok(p) => p,
+            Err(_) => {
+                warn!("semaphore closed — stopping early");
+                break;
+            }
         };
 
         let ctx = Arc::new(WorkerContext {
-            proto:             Arc::clone(&proto),
-            target:            target.clone(),
-            config:            config.clone(),
-            tx:                tx.clone(),
-            counters:          Arc::clone(&counters),
-            found:             Arc::clone(&found),
-            cancel:            cancel.clone(),
-            paused:            Arc::clone(&paused),
+            proto: Arc::clone(&proto),
+            target: target.clone(),
+            config: config.clone(),
+            tx: tx.clone(),
+            counters: Arc::clone(&counters),
+            found: Arc::clone(&found),
+            cancel: cancel.clone(),
+            paused: Arc::clone(&paused),
             dispatch_strategy: Arc::clone(&dispatch_strategy),
         });
 
         join_set.spawn(async move {
-            let _permit = permit;   // released when this task ends
+            let _permit = permit; // released when this task ends
             run_worker(ctx, cred).await;
         });
     }
@@ -279,7 +297,7 @@ async fn throttle_rps(config: &AttackConfig, dispatched: &mut u64, start: Instan
     }
     *dispatched += 1;
     let expected_ms = (*dispatched * 1_000) / config.target_rps;
-    let actual_ms   = start.elapsed().as_millis() as u64;
+    let actual_ms = start.elapsed().as_millis() as u64;
     if actual_ms < expected_ms {
         tokio::time::sleep(Duration::from_millis(expected_ms - actual_ms)).await;
     }
@@ -306,9 +324,9 @@ async fn run_worker(ctx: Arc<WorkerContext>, cred: Credential) {
         return;
     }
 
-    let attempt_start  = Instant::now();
-    let attack_result  = retry_authenticate(&ctx, &cred).await;
-    let done           = ctx.counters.attempts.fetch_add(1, Ordering::Relaxed) + 1;
+    let attempt_start = Instant::now();
+    let attack_result = retry_authenticate(&ctx, &cred).await;
+    let done = ctx.counters.attempts.fetch_add(1, Ordering::Relaxed) + 1;
 
     record_result(&ctx, &cred, &attack_result, done, attempt_start);
 }
@@ -339,11 +357,15 @@ async fn retry_authenticate(ctx: &WorkerContext, cred: &Credential) -> AttackRes
                 tokio::time::sleep(ctx.config.retry_delay).await;
             }
             AttackResult::RateLimit => {
-                let hits        = ctx.counters.rate_limits.fetch_add(1, Ordering::Relaxed) + 1;
-                let backoff_ms  = backoff_ms_for_hit(hits);
-                warn!(backoff_ms, rate_limit_hits = hits, "rate limited — backing off");
+                let hits = ctx.counters.rate_limits.fetch_add(1, Ordering::Relaxed) + 1;
+                let backoff_ms = backoff_ms_for_hit(hits);
+                warn!(
+                    backoff_ms,
+                    rate_limit_hits = hits,
+                    "rate limited — backing off"
+                );
                 tokio::time::sleep(Duration::from_millis(backoff_ms)).await;
-                return result;   // counter already bumped; stop retrying
+                return result; // counter already bumped; stop retrying
             }
             _ => return result,
         }
@@ -354,10 +376,10 @@ async fn retry_authenticate(ctx: &WorkerContext, cred: &Credential) -> AttackRes
 #[inline]
 fn map_protocol_result(raw: Result<AttackResult, ZeusError>) -> AttackResult {
     match raw {
-        Ok(r)                      => r,
+        Ok(r) => r,
         Err(ZeusError::Timeout(_)) => AttackResult::Timeout,
-        Err(ZeusError::RateLimit)  => AttackResult::RateLimit,
-        Err(e)                     => AttackResult::Error(e.to_string()),
+        Err(ZeusError::RateLimit) => AttackResult::RateLimit,
+        Err(e) => AttackResult::Error(e.to_string()),
     }
 }
 
@@ -376,10 +398,10 @@ fn backoff_ms_for_hit(hits: u64) -> u64 {
 ///
 /// Responsibility: result accounting and event emission only.
 fn record_result(
-    ctx:           &WorkerContext,
-    cred:          &Credential,
-    result:        &AttackResult,
-    done:          u64,
+    ctx: &WorkerContext,
+    cred: &Credential,
+    result: &AttackResult,
+    done: u64,
     attempt_start: Instant,
 ) {
     match result {
@@ -394,18 +416,24 @@ fn record_result(
                 ctx.cancel.cancel();
             }
         }
-        AttackResult::Failure        => { ctx.counters.failures.fetch_add(1, Ordering::Relaxed); }
-        AttackResult::Error(_)       => { ctx.counters.errors.fetch_add(1, Ordering::Relaxed); }
-        AttackResult::Timeout        => { ctx.counters.timeouts.fetch_add(1, Ordering::Relaxed); }
+        AttackResult::Failure => {
+            ctx.counters.failures.fetch_add(1, Ordering::Relaxed);
+        }
+        AttackResult::Error(_) => {
+            ctx.counters.errors.fetch_add(1, Ordering::Relaxed);
+        }
+        AttackResult::Timeout => {
+            ctx.counters.timeouts.fetch_add(1, Ordering::Relaxed);
+        }
         // RateLimit counter is bumped inside retry_authenticate before returning.
-        AttackResult::RateLimit      => {}
+        AttackResult::RateLimit => {}
     }
 
     let _ = ctx.tx.send(ProgressEvent::Attempt {
-        credential:    cred.clone(),
-        result:        result.clone(),
+        credential: cred.clone(),
+        result: result.clone(),
         attempts_done: done,
-        started_at:    attempt_start,
+        started_at: attempt_start,
     });
 }
 
@@ -417,14 +445,14 @@ fn record_result(
 ///
 /// Responsibility: building and sending the terminal event only.
 fn emit_session_finished(
-    tx:       &broadcast::Sender<ProgressEvent>,
+    tx: &broadcast::Sender<ProgressEvent>,
     counters: &SessionCounters,
-    found:    &parking_lot::Mutex<Vec<Credential>>,
-    start:    Instant,
+    found: &parking_lot::Mutex<Vec<Credential>>,
+    start: Instant,
 ) {
-    let total   = counters.attempts.load(Ordering::Relaxed);
+    let total = counters.attempts.load(Ordering::Relaxed);
     let elapsed = start.elapsed();
-    let rate    = if elapsed.as_secs_f64() > 0.0 {
+    let rate = if elapsed.as_secs_f64() > 0.0 {
         total as f64 / elapsed.as_secs_f64()
     } else {
         0.0
@@ -434,15 +462,15 @@ fn emit_session_finished(
     let found_snapshot = found.lock().clone();
 
     let _ = tx.send(ProgressEvent::SessionFinished {
-        found:            found_snapshot,
-        total_attempts:   total,
+        found: found_snapshot,
+        total_attempts: total,
         elapsed,
-        successes:        counters.successes.load(Ordering::Relaxed),
-        failures:         counters.failures.load(Ordering::Relaxed),
-        errors:           counters.errors.load(Ordering::Relaxed),
-        rate_limits:      counters.rate_limits.load(Ordering::Relaxed),
-        timeouts:         counters.timeouts.load(Ordering::Relaxed),
-        rate_per_second:  rate,
+        successes: counters.successes.load(Ordering::Relaxed),
+        failures: counters.failures.load(Ordering::Relaxed),
+        errors: counters.errors.load(Ordering::Relaxed),
+        rate_limits: counters.rate_limits.load(Ordering::Relaxed),
+        timeouts: counters.timeouts.load(Ordering::Relaxed),
+        rate_per_second: rate,
     });
 }
 
@@ -457,15 +485,21 @@ mod tests {
     use std::time::Duration;
     use tokio_stream::iter as stream_iter;
     use zeus_attack::{AttackStrategy, CredentialStream};
-    use zeus_core::{AttackConfig, AttackConfigBuilder, AttackResult, Credential, Protocol, Target, ZeusError};
+    use zeus_core::{
+        AttackConfig, AttackConfigBuilder, AttackResult, Credential, Protocol, Target, ZeusError,
+    };
     use zeus_services::registry::ProtocolRegistry;
 
     struct MockSuccessProtocol;
 
     #[async_trait]
     impl Protocol for MockSuccessProtocol {
-        fn name(&self) -> &'static str { "mock" }
-        fn default_port(&self) -> u16 { 9999 }
+        fn name(&self) -> &'static str {
+            "mock"
+        }
+        fn default_port(&self) -> u16 {
+            9999
+        }
         async fn authenticate(
             &self,
             _target: &Target,
@@ -484,8 +518,12 @@ mod tests {
 
     #[async_trait]
     impl Protocol for MockFailureProtocol {
-        fn name(&self) -> &'static str { "mock" }
-        fn default_port(&self) -> u16 { 9999 }
+        fn name(&self) -> &'static str {
+            "mock"
+        }
+        fn default_port(&self) -> u16 {
+            9999
+        }
         async fn authenticate(
             &self,
             _target: &Target,
@@ -500,8 +538,12 @@ mod tests {
 
     #[async_trait]
     impl Protocol for MockErrorProtocol {
-        fn name(&self) -> &'static str { "mock" }
-        fn default_port(&self) -> u16 { 9999 }
+        fn name(&self) -> &'static str {
+            "mock"
+        }
+        fn default_port(&self) -> u16 {
+            9999
+        }
         async fn authenticate(
             &self,
             _target: &Target,
@@ -518,8 +560,12 @@ mod tests {
 
     #[async_trait]
     impl Protocol for MockRateLimitProtocol {
-        fn name(&self) -> &'static str { "mock" }
-        fn default_port(&self) -> u16 { 9999 }
+        fn name(&self) -> &'static str {
+            "mock"
+        }
+        fn default_port(&self) -> u16 {
+            9999
+        }
         async fn authenticate(
             &self,
             _target: &Target,
@@ -542,7 +588,9 @@ mod tests {
     }
 
     impl AttackStrategy for StaticStrategy {
-        fn name(&self) -> &'static str { "static" }
+        fn name(&self) -> &'static str {
+            "static"
+        }
         fn credentials(&self) -> CredentialStream {
             Box::pin(stream_iter(self.creds.clone()))
         }
@@ -581,7 +629,10 @@ mod tests {
     #[tokio::test]
     async fn stop_on_first_halts_after_one_success() {
         let registry = mock_registry(Arc::new(MockSuccessProtocol));
-        let config = AttackConfigBuilder::new().stop_on_first(true).max_tasks(1).build();
+        let config = AttackConfigBuilder::new()
+            .stop_on_first(true)
+            .max_tasks(1)
+            .build();
         let engine = Engine::new(registry, config);
         let strategy = Box::new(StaticStrategy::new(creds(10)));
 
@@ -597,7 +648,10 @@ mod tests {
         let strategy = Box::new(StaticStrategy::new(creds(5)));
 
         let (found, _rx) = engine.run(target(), strategy).await;
-        assert!(found.is_empty(), "failure protocol should yield no credentials");
+        assert!(
+            found.is_empty(),
+            "failure protocol should yield no credentials"
+        );
     }
 
     #[tokio::test]
@@ -636,7 +690,9 @@ mod tests {
     #[tokio::test]
     async fn rate_limit_protocol_bumps_counter() {
         let calls = Arc::new(AtomicU64::new(0));
-        let proto = MockRateLimitProtocol { calls: Arc::clone(&calls) };
+        let proto = MockRateLimitProtocol {
+            calls: Arc::clone(&calls),
+        };
         let registry = mock_registry(Arc::new(proto));
         let config = AttackConfigBuilder::new()
             .max_retries(0)
@@ -694,11 +750,15 @@ mod tests {
             .stop_on_first(false)
             .max_tasks(1)
             .build();
-        let engine = Engine::new(registry, config)
-            .with_dispatch_strategy(Arc::new(StopOnFirstStrategy));
+        let engine =
+            Engine::new(registry, config).with_dispatch_strategy(Arc::new(StopOnFirstStrategy));
         let strategy = Box::new(StaticStrategy::new(creds(10)));
 
         let (found, _rx) = engine.run(target(), strategy).await;
-        assert_eq!(found.len(), 1, "StopOnFirstStrategy must stop after first success");
+        assert_eq!(
+            found.len(),
+            1,
+            "StopOnFirstStrategy must stop after first success"
+        );
     }
 }

@@ -65,32 +65,37 @@ pub enum UebaTechnique {
 impl UebaTechnique {
     fn label(&self) -> &'static str {
         match self {
-            Self::SlowBruteForce           => "SlowBruteForce",
-            Self::GeographicVelocity       => "GeographicVelocity",
-            Self::UserAgentSwitching       => "UserAgentSwitching",
-            Self::OffHoursAccess           => "OffHoursAccess",
-            Self::UnusualEndpointSequence  => "UnusualEndpointSequence",
+            Self::SlowBruteForce => "SlowBruteForce",
+            Self::GeographicVelocity => "GeographicVelocity",
+            Self::UserAgentSwitching => "UserAgentSwitching",
+            Self::OffHoursAccess => "OffHoursAccess",
+            Self::UnusualEndpointSequence => "UnusualEndpointSequence",
         }
     }
 
     /// Return a blue-team remediation hint for this technique.
     pub fn remediation_hint(&self) -> &'static str {
         match self {
-            Self::SlowBruteForce =>
+            Self::SlowBruteForce => {
                 "Lower brute-force alert thresholds to 3–5 failures per hour; \
-                 add credential-stuffing rules using breach-database correlation.",
-            Self::GeographicVelocity =>
+                 add credential-stuffing rules using breach-database correlation."
+            }
+            Self::GeographicVelocity => {
                 "Alert on impossible travel: same session from IPs >500 km apart \
-                 within a time window shorter than the travel time.",
-            Self::UserAgentSwitching =>
+                 within a time window shorter than the travel time."
+            }
+            Self::UserAgentSwitching => {
                 "Pin the User-Agent to the session on first authenticated request; \
-                 alert on mid-session UA changes.",
-            Self::OffHoursAccess =>
+                 alert on mid-session UA changes."
+            }
+            Self::OffHoursAccess => {
                 "Build per-user baseline login-hour profiles; alert on z-score >3 \
-                 deviations from the baseline access window.",
-            Self::UnusualEndpointSequence =>
+                 deviations from the baseline access window."
+            }
+            Self::UnusualEndpointSequence => {
                 "Model expected endpoint-visit sequences with a Markov chain; alert \
-                 when transition probability falls below a threshold (e.g. 1e-4).",
+                 when transition probability falls below a threshold (e.g. 1e-4)."
+            }
         }
     }
 }
@@ -118,7 +123,7 @@ pub struct UebaFinding {
 ///
 /// # Usage
 /// ```no_run
-/// # use zeus_core::ueba_probe::{UebaProbe, UebaTechnique};
+/// # use zeus_core::probe::ueba_probe::{UebaProbe, UebaTechnique};
 /// # async fn run() -> anyhow::Result<()> {
 /// // Provide a concrete UebaHttpClient implementation (e.g. wrapping zeus_net::HttpClient)
 /// # Ok(()) }
@@ -134,14 +139,20 @@ pub struct UebaProbe {
 
 impl Default for UebaProbe {
     fn default() -> Self {
-        Self { baseline_requests: 10, anomaly_threshold: 0.5 }
+        Self {
+            baseline_requests: 10,
+            anomaly_threshold: 0.5,
+        }
     }
 }
 
 impl UebaProbe {
     /// Create a new probe with explicit settings.
     pub fn new(baseline_requests: u32, anomaly_threshold: f32) -> Self {
-        Self { baseline_requests, anomaly_threshold }
+        Self {
+            baseline_requests,
+            anomaly_threshold,
+        }
     }
 
     /// Send `baseline_requests` ordinary GET requests to warm up any behavioural
@@ -179,7 +190,10 @@ impl UebaProbe {
         client: &dyn UebaHttpClient,
         target: &Target,
     ) -> Result<UebaFinding, UebaError> {
-        info!(technique = technique.label(), "UebaProbe: injecting anomaly");
+        info!(
+            technique = technique.label(),
+            "UebaProbe: injecting anomaly"
+        );
         let base_url = target.uri();
 
         let (status, body, evidence) = match &technique {
@@ -218,9 +232,8 @@ impl UebaProbe {
                     .get(&format!("{}/profile", base_url))
                     .await
                     .map_err(|e| UebaError::Injection(e.to_string()))?;
-                let ev = format!(
-                    "Mid-session User-Agent change (bot UA injected); server returned {s}"
-                );
+                let ev =
+                    format!("Mid-session User-Agent change (bot UA injected); server returned {s}");
                 (s, b, ev)
             }
 
@@ -254,12 +267,14 @@ impl UebaProbe {
         let detected = self.response_looks_blocked(status, &body);
         debug!(
             technique = technique.label(),
-            detected,
-            status,
-            "UebaProbe: anomaly result"
+            detected, status, "UebaProbe: anomaly result"
         );
 
-        Ok(UebaFinding { technique, detected, evidence })
+        Ok(UebaFinding {
+            technique,
+            detected,
+            evidence,
+        })
     }
 
     /// Summarise a set of findings as remediation hints for the blue team.
@@ -311,8 +326,16 @@ mod tests {
     }
 
     impl FakeClient {
-        fn ok()      -> Self { Self { response: Mutex::new((200, "Welcome".into())) } }
-        fn blocked() -> Self { Self { response: Mutex::new((403, "Blocked".into())) } }
+        fn ok() -> Self {
+            Self {
+                response: Mutex::new((200, "Welcome".into())),
+            }
+        }
+        fn blocked() -> Self {
+            Self {
+                response: Mutex::new((403, "Blocked".into())),
+            }
+        }
     }
 
     #[async_trait::async_trait]
@@ -402,7 +425,11 @@ mod tests {
             UebaTechnique::UnusualEndpointSequence,
         ];
         for t in &techniques {
-            assert!(!t.remediation_hint().is_empty(), "{} missing hint", t.label());
+            assert!(
+                !t.remediation_hint().is_empty(),
+                "{} missing hint",
+                t.label()
+            );
         }
     }
 

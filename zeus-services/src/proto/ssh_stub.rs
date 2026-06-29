@@ -14,9 +14,15 @@ pub struct SshProtocol;
 
 #[async_trait]
 impl Protocol for SshProtocol {
-    fn name(&self) -> &'static str { "ssh" }
-    fn default_port(&self) -> u16 { 22 }
-    fn description(&self) -> &'static str { "SSH-2 password authentication (stub — russh not available)" }
+    fn name(&self) -> &'static str {
+        "ssh"
+    }
+    fn default_port(&self) -> u16 {
+        22
+    }
+    fn description(&self) -> &'static str {
+        "SSH-2 password authentication (stub — russh not available)"
+    }
 
     async fn authenticate(
         &self,
@@ -24,7 +30,9 @@ impl Protocol for SshProtocol {
         _cred: &Credential,
         _config: &AttackConfig,
     ) -> Result<AttackResult, ZeusError> {
-        Err(ZeusError::Protocol("SSH support requires the russh crate which is not compiled into this build".into()))
+        Err(ZeusError::Protocol(
+            "SSH support requires the russh crate which is not compiled into this build".into(),
+        ))
     }
 }
 
@@ -70,7 +78,12 @@ pub struct SshUserEnumProbe {
 
 impl SshUserEnumProbe {
     pub fn new(host: impl Into<String>, port: u16, timeout: std::time::Duration) -> Self {
-        Self { host: host.into(), port, timeout, observers: Vec::new() }
+        Self {
+            host: host.into(),
+            port,
+            timeout,
+            observers: Vec::new(),
+        }
     }
 
     pub fn add_observer(&mut self, obs: Arc<dyn TimingObserver>) {

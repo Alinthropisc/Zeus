@@ -56,8 +56,12 @@ fn snmp_get_request(community: &str, version: u8) -> Vec<u8> {
 
 #[async_trait]
 impl Protocol for SnmpProtocol {
-    fn name(&self) -> &'static str { "snmp" }
-    fn default_port(&self) -> u16 { 161 }
+    fn name(&self) -> &'static str {
+        "snmp"
+    }
+    fn default_port(&self) -> u16 {
+        161
+    }
     fn description(&self) -> &'static str {
         "SNMP community string brute-force (v1/v2c UDP). Password field = community string."
     }
@@ -69,11 +73,21 @@ impl Protocol for SnmpProtocol {
         config: &AttackConfig,
     ) -> Result<AttackResult, ZeusError> {
         let addr_str = format!("{}:{}", target.host, target.port);
-        let addr = addr_str.to_socket_addrs().map_err(ZeusError::Network)?
-            .next().ok_or_else(|| ZeusError::Protocol("DNS failed".into()))?;
+        let addr = addr_str
+            .to_socket_addrs()
+            .map_err(ZeusError::Network)?
+            .next()
+            .ok_or_else(|| ZeusError::Protocol("DNS failed".into()))?;
 
-        let version_str = target.options.get("version").map(String::as_str).unwrap_or("1");
-        let version: u8 = match version_str { "2c" | "2" => 1, _ => 0 };
+        let version_str = target
+            .options
+            .get("version")
+            .map(String::as_str)
+            .unwrap_or("1");
+        let version: u8 = match version_str {
+            "2c" | "2" => 1,
+            _ => 0,
+        };
 
         let community = &cred.password; // community string is the "password"
         let packet = snmp_get_request(community, version);
@@ -87,8 +101,12 @@ impl Protocol for SnmpProtocol {
 
         let result = tokio::task::spawn_blocking(move || -> Result<bool, String> {
             let socket = UdpSocket::bind("0.0.0.0:0").map_err(|e| e.to_string())?;
-            socket.set_read_timeout(Some(timeout_dur)).map_err(|e| e.to_string())?;
-            socket.send_to(&packet_clone, addr_clone).map_err(|e| e.to_string())?;
+            socket
+                .set_read_timeout(Some(timeout_dur))
+                .map_err(|e| e.to_string())?;
+            socket
+                .send_to(&packet_clone, addr_clone)
+                .map_err(|e| e.to_string())?;
             let mut buf = [0u8; 1024];
             match socket.recv_from(&mut buf) {
                 Ok((n, _)) => {
@@ -104,7 +122,10 @@ impl Protocol for SnmpProtocol {
         .map_err(|e| ZeusError::Protocol(e))?;
 
         if result {
-            Ok(AttackResult::Success { credential: cred.clone(), elapsed: start.elapsed() })
+            Ok(AttackResult::Success {
+                credential: cred.clone(),
+                elapsed: start.elapsed(),
+            })
         } else {
             Ok(AttackResult::Failure)
         }

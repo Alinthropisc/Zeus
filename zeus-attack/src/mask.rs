@@ -19,7 +19,11 @@ impl MaskStrategy {
     pub fn new(username: impl Into<String>, mask: impl Into<String>) -> Self {
         let mask = mask.into();
         let positions = Self::parse_mask(&mask);
-        Self { username: username.into(), positions, mask }
+        Self {
+            username: username.into(),
+            positions,
+            mask,
+        }
     }
 
     fn parse_mask(mask: &str) -> Vec<Vec<char>> {
@@ -33,7 +37,8 @@ impl MaskStrategy {
                     Some('d') => CHARSET_DIGIT.chars().collect(),
                     Some('s') => CHARSET_SPECIAL.chars().collect(),
                     Some('a') => {
-                        let mut all: Vec<char> = CHARSET_LOWER.chars()
+                        let mut all: Vec<char> = CHARSET_LOWER
+                            .chars()
                             .chain(CHARSET_UPPER.chars())
                             .chain(CHARSET_DIGIT.chars())
                             .chain(CHARSET_SPECIAL.chars())
@@ -91,7 +96,9 @@ impl MaskStrategy {
 }
 
 impl AttackStrategy for MaskStrategy {
-    fn name(&self) -> &'static str { "mask" }
+    fn name(&self) -> &'static str {
+        "mask"
+    }
 
     fn credentials(&self) -> CredentialStream {
         Box::pin(iter(self.generate_all()))

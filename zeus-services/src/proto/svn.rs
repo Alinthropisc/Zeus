@@ -21,9 +21,15 @@ impl Default for SvnProtocol {
 
 #[async_trait]
 impl Protocol for SvnProtocol {
-    fn name(&self) -> &'static str { "svn" }
-    fn default_port(&self) -> u16 { 3690 }
-    fn description(&self) -> &'static str { "Subversion HTTP authentication (port 3690 or 80/443 via mod_dav_svn)" }
+    fn name(&self) -> &'static str {
+        "svn"
+    }
+    fn default_port(&self) -> u16 {
+        3690
+    }
+    fn description(&self) -> &'static str {
+        "Subversion HTTP authentication (port 3690 or 80/443 via mod_dav_svn)"
+    }
 
     async fn authenticate(
         &self,
@@ -52,7 +58,10 @@ impl Protocol for SvnProtocol {
         debug!("SVN resp: {}", status);
 
         if status.is_success() || status.as_u16() == 301 {
-            Ok(AttackResult::Success { credential: cred.clone(), elapsed: start.elapsed() })
+            Ok(AttackResult::Success {
+                credential: cred.clone(),
+                elapsed: start.elapsed(),
+            })
         } else {
             Ok(AttackResult::Failure)
         }

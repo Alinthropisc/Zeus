@@ -1,12 +1,12 @@
 //! Radmin v2 remote administration authentication, port 4899.
 
+use crate::net::TcpConnection;
 use async_trait::async_trait;
 use md5::{Digest, Md5};
 use std::net::ToSocketAddrs;
 use std::time::Instant;
 use tracing::debug;
 use zeus_core::{AttackConfig, AttackResult, Credential, Protocol, Target, ZeusError};
-use crate::net::TcpConnection;
 
 pub struct Radmin2Protocol;
 
@@ -52,9 +52,15 @@ fn build_radmin_msg(type_byte: u8, data: &[u8; 32], length: u32) -> Vec<u8> {
 
 #[async_trait]
 impl Protocol for Radmin2Protocol {
-    fn name(&self) -> &'static str { "radmin2" }
-    fn default_port(&self) -> u16 { 4899 }
-    fn description(&self) -> &'static str { "Radmin v2 remote administration" }
+    fn name(&self) -> &'static str {
+        "radmin2"
+    }
+    fn default_port(&self) -> u16 {
+        4899
+    }
+    fn description(&self) -> &'static str {
+        "Radmin v2 remote administration"
+    }
 
     async fn authenticate(
         &self,
@@ -129,7 +135,10 @@ impl Protocol for Radmin2Protocol {
 
         // Success: magic=0x01, length=0x01000000 (LE), type=0x00
         if result.len() >= 10 && result[0] == 0x01 && result[9] == 0x00 {
-            Ok(AttackResult::Success { credential: cred.clone(), elapsed: start.elapsed() })
+            Ok(AttackResult::Success {
+                credential: cred.clone(),
+                elapsed: start.elapsed(),
+            })
         } else {
             Ok(AttackResult::Failure)
         }

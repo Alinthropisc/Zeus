@@ -50,16 +50,16 @@ fn xdr_string(s: &str) -> Vec<u8> {
 fn build_pcnfs_auth_rpc(xid: u32, username: &str, password: &str) -> Vec<u8> {
     let mut pkt = Vec::new();
     pkt.extend_from_slice(&xid.to_be_bytes());
-    pkt.extend_from_slice(&0u32.to_be_bytes());       // CALL
-    pkt.extend_from_slice(&2u32.to_be_bytes());       // RPC v2
-    pkt.extend_from_slice(&150001u32.to_be_bytes());  // pcnfsd program
-    pkt.extend_from_slice(&1u32.to_be_bytes());       // version 1
-    pkt.extend_from_slice(&1u32.to_be_bytes());       // AUTH procedure
-    pkt.extend_from_slice(&[0u8; 8]);                 // credentials (AUTH_NULL)
-    pkt.extend_from_slice(&[0u8; 8]);                 // verifier   (AUTH_NULL)
+    pkt.extend_from_slice(&0u32.to_be_bytes()); // CALL
+    pkt.extend_from_slice(&2u32.to_be_bytes()); // RPC v2
+    pkt.extend_from_slice(&150001u32.to_be_bytes()); // pcnfsd program
+    pkt.extend_from_slice(&1u32.to_be_bytes()); // version 1
+    pkt.extend_from_slice(&1u32.to_be_bytes()); // AUTH procedure
+    pkt.extend_from_slice(&[0u8; 8]); // credentials (AUTH_NULL)
+    pkt.extend_from_slice(&[0u8; 8]); // verifier   (AUTH_NULL)
     pkt.extend_from_slice(&xdr_string(username));
     pkt.extend_from_slice(&xdr_string(password));
-    pkt.extend_from_slice(&xdr_string("zeus"));       // client-id
+    pkt.extend_from_slice(&xdr_string("zeus")); // client-id
     pkt
 }
 
@@ -69,8 +69,12 @@ pub struct PcNfsProtocol;
 
 #[async_trait]
 impl Protocol for PcNfsProtocol {
-    fn name(&self) -> &'static str { "pcnfs" }
-    fn default_port(&self) -> u16 { 640 }
+    fn name(&self) -> &'static str {
+        "pcnfs"
+    }
+    fn default_port(&self) -> u16 {
+        640
+    }
     fn description(&self) -> &'static str {
         "PC-NFS authentication daemon (UDP/RPC, program 150001)"
     }
@@ -129,7 +133,9 @@ impl Protocol for PcNfsProtocol {
 
         // RPC reply type must be 1 (REPLY) at bytes [4..8].
         if n < 8 {
-            return Ok(AttackResult::Error("PcNFS: reply too short for type field".into()));
+            return Ok(AttackResult::Error(
+                "PcNFS: reply too short for type field".into(),
+            ));
         }
         let reply_type = u32::from_be_bytes([reply[4], reply[5], reply[6], reply[7]]);
         if reply_type != 1 {

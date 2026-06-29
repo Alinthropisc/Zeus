@@ -44,7 +44,9 @@ pub struct ProtocolRegistry {
 
 impl ProtocolRegistry {
     pub fn new() -> Self {
-        Self { protocols: DashMap::new() }
+        Self {
+            protocols: DashMap::new(),
+        }
     }
 
     pub fn register(&self, protocol: Arc<dyn Protocol>) {
@@ -113,21 +115,23 @@ impl ProtocolRegistry {
 }
 
 impl Default for ProtocolRegistry {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 /// Build a registry pre-loaded with all built-in protocols.
 pub fn default_registry() -> ProtocolRegistry {
     use crate::database::{
-        FirebirdProtocol, MemcachedProtocol, MongoDbProtocol, MssqlProtocol,
-        MySqlProtocol, OracleProtocol, PostgresProtocol, RedisProtocol,
+        FirebirdProtocol, MemcachedProtocol, MongoDbProtocol, MssqlProtocol, MySqlProtocol,
+        OracleProtocol, PostgresProtocol, RedisProtocol,
     };
     use crate::proto::{
-        CvsProtocol, FtpProtocol, HttpFormProtocol, HttpProtocol, HttpProxyProtocol,
-        ImapProtocol, IrcProtocol, LdapProtocol, NntpProtocol, Pop3Protocol,
-        RdpProtocol, RexecProtocol, RshProtocol, RtspProtocol, SipProtocol,
-        SmbProtocol, SmtpEnumProtocol, SmtpProtocol, SnmpProtocol, Socks5Protocol,
-        SshProtocol, SvnProtocol, TelnetProtocol, VncProtocol, XmppProtocol,
+        CvsProtocol, FtpProtocol, HttpFormProtocol, HttpProtocol, HttpProxyProtocol, ImapProtocol,
+        IrcProtocol, LdapProtocol, NntpProtocol, Pop3Protocol, RdpProtocol, RexecProtocol,
+        RshProtocol, RtspProtocol, SipProtocol, SmbProtocol, SmtpEnumProtocol, SmtpProtocol,
+        SnmpProtocol, Socks5Protocol, SshProtocol, SvnProtocol, TelnetProtocol, VncProtocol,
+        XmppProtocol,
     };
 
     let r = ProtocolRegistry::new();
@@ -235,15 +239,26 @@ impl ProtocolProbeHandler {
         description: &'static str,
         port: u16,
     ) -> Self {
-        Self { inner, name, description, port }
+        Self {
+            inner,
+            name,
+            description,
+            port,
+        }
     }
 }
 
 #[async_trait]
 impl ProbeHandler for ProtocolProbeHandler {
-    fn protocol(&self) -> &'static str { self.name }
-    fn default_port(&self) -> u16 { self.port }
-    fn description(&self) -> &'static str { self.description }
+    fn protocol(&self) -> &'static str {
+        self.name
+    }
+    fn default_port(&self) -> u16 {
+        self.port
+    }
+    fn description(&self) -> &'static str {
+        self.description
+    }
 
     async fn probe(&self, target: &Target, cred: &Credential) -> ProbeOutcome {
         let config = AttackConfig::default();
@@ -263,7 +278,9 @@ impl ProbeHandler for ProtocolProbeHandler {
             },
             Ok(AttackResult::Error(msg)) => ProbeOutcome::Error { detail: msg },
             Err(ZeusError::Timeout(_)) => ProbeOutcome::Timeout,
-            Err(e) => ProbeOutcome::Error { detail: e.to_string() },
+            Err(e) => ProbeOutcome::Error {
+                detail: e.to_string(),
+            },
         }
     }
 }
@@ -287,7 +304,9 @@ pub struct FactoryRegistry {
 
 impl FactoryRegistry {
     pub fn new() -> Self {
-        Self { factories: DashMap::new() }
+        Self {
+            factories: DashMap::new(),
+        }
     }
 
     pub fn register(&self, name: &'static str, factory: HandlerFactory) {
@@ -311,15 +330,15 @@ impl FactoryRegistry {
     /// Build a `FactoryRegistry` pre-loaded with every built-in protocol.
     pub fn with_builtins() -> Self {
         use crate::database::{
-            FirebirdProtocol, MemcachedProtocol, MongoDbProtocol, MssqlProtocol,
-            MySqlProtocol, OracleProtocol, PostgresProtocol, RedisProtocol,
+            FirebirdProtocol, MemcachedProtocol, MongoDbProtocol, MssqlProtocol, MySqlProtocol,
+            OracleProtocol, PostgresProtocol, RedisProtocol,
         };
         use crate::proto::{
             CvsProtocol, FtpProtocol, HttpFormProtocol, HttpProtocol, HttpProxyProtocol,
-            ImapProtocol, IrcProtocol, LdapProtocol, NntpProtocol, Pop3Protocol,
-            RdpProtocol, RexecProtocol, RshProtocol, RtspProtocol, SipProtocol,
-            SmbProtocol, SmtpEnumProtocol, SmtpProtocol, SnmpProtocol, Socks5Protocol,
-            SshProtocol, SvnProtocol, TelnetProtocol, VncProtocol, XmppProtocol,
+            ImapProtocol, IrcProtocol, LdapProtocol, NntpProtocol, Pop3Protocol, RdpProtocol,
+            RexecProtocol, RshProtocol, RtspProtocol, SipProtocol, SmbProtocol, SmtpEnumProtocol,
+            SmtpProtocol, SnmpProtocol, Socks5Protocol, SshProtocol, SvnProtocol, TelnetProtocol,
+            VncProtocol, XmppProtocol,
         };
 
         let r = Self::new();
@@ -327,54 +346,156 @@ impl FactoryRegistry {
         macro_rules! reg {
             ($name:literal, $desc:literal, $port:expr, $ctor:expr) => {
                 r.register($name, || {
-                    Box::new(ProtocolProbeHandler::new(Arc::new($ctor), $name, $desc, $port))
+                    Box::new(ProtocolProbeHandler::new(
+                        Arc::new($ctor),
+                        $name,
+                        $desc,
+                        $port,
+                    ))
                 });
             };
         }
 
         // Application layer
-        reg!("http",       "HTTP Basic/Form authentication",           80,   HttpProtocol::default());
-        reg!("http-form",  "HTTP HTML form brute-force",               80,   HttpFormProtocol::default());
-        reg!("http-proxy", "HTTP Proxy authentication",                3128, HttpProxyProtocol::default());
-        reg!("ftp",        "FTP username/password authentication",     21,   FtpProtocol);
-        reg!("smtp",       "SMTP AUTH LOGIN/PLAIN",                    25,   SmtpProtocol);
-        reg!("smtp-enum",  "SMTP VRFY/EXPN user enumeration",          25,   SmtpEnumProtocol);
-        reg!("pop3",       "POP3 USER/PASS authentication",            110,  Pop3Protocol);
-        reg!("imap",       "IMAP LOGIN authentication",                143,  ImapProtocol);
-        reg!("nntp",       "NNTP AUTHINFO authentication",             119,  NntpProtocol);
-        reg!("telnet",     "Telnet login prompt brute-force",          23,   TelnetProtocol);
-        reg!("ssh",        "SSH-2 password authentication via russh",  22,   SshProtocol);
-        reg!("irc",        "IRC PASS/NICK authentication",             6667, IrcProtocol);
-        reg!("xmpp",       "XMPP SASL PLAIN authentication",          5222, XmppProtocol);
-        reg!("sip",        "SIP REGISTER Digest authentication",       5060, SipProtocol);
-        reg!("rtsp",       "RTSP Basic authentication",                554,  RtspProtocol::default());
-        reg!("svn",        "Subversion HTTP authentication",           3690, SvnProtocol::default());
-        reg!("cvs",        "CVS pserver authentication",               2401, CvsProtocol);
-        reg!("socks5",     "SOCKS5 username/password authentication",  1080, Socks5Protocol);
+        reg!(
+            "http",
+            "HTTP Basic/Form authentication",
+            80,
+            HttpProtocol::default()
+        );
+        reg!(
+            "http-form",
+            "HTTP HTML form brute-force",
+            80,
+            HttpFormProtocol::default()
+        );
+        reg!(
+            "http-proxy",
+            "HTTP Proxy authentication",
+            3128,
+            HttpProxyProtocol::default()
+        );
+        reg!(
+            "ftp",
+            "FTP username/password authentication",
+            21,
+            FtpProtocol
+        );
+        reg!("smtp", "SMTP AUTH LOGIN/PLAIN", 25, SmtpProtocol);
+        reg!(
+            "smtp-enum",
+            "SMTP VRFY/EXPN user enumeration",
+            25,
+            SmtpEnumProtocol
+        );
+        reg!("pop3", "POP3 USER/PASS authentication", 110, Pop3Protocol);
+        reg!("imap", "IMAP LOGIN authentication", 143, ImapProtocol);
+        reg!("nntp", "NNTP AUTHINFO authentication", 119, NntpProtocol);
+        reg!(
+            "telnet",
+            "Telnet login prompt brute-force",
+            23,
+            TelnetProtocol
+        );
+        reg!(
+            "ssh",
+            "SSH-2 password authentication via russh",
+            22,
+            SshProtocol
+        );
+        reg!("irc", "IRC PASS/NICK authentication", 6667, IrcProtocol);
+        reg!("xmpp", "XMPP SASL PLAIN authentication", 5222, XmppProtocol);
+        reg!(
+            "sip",
+            "SIP REGISTER Digest authentication",
+            5060,
+            SipProtocol
+        );
+        reg!(
+            "rtsp",
+            "RTSP Basic authentication",
+            554,
+            RtspProtocol::default()
+        );
+        reg!(
+            "svn",
+            "Subversion HTTP authentication",
+            3690,
+            SvnProtocol::default()
+        );
+        reg!("cvs", "CVS pserver authentication", 2401, CvsProtocol);
+        reg!(
+            "socks5",
+            "SOCKS5 username/password authentication",
+            1080,
+            Socks5Protocol
+        );
         // Network / system
-        reg!("ldap",       "LDAP simple bind authentication",          389,  LdapProtocol);
-        reg!("snmp",       "SNMPv1/v2c community string brute-force",  161,  SnmpProtocol);
-        reg!("smb",        "SMB2 NTLMv2 challenge-response",           445,  SmbProtocol);
-        reg!("rdp",        "RDP NLA/Classic authentication",           3389, RdpProtocol);
-        reg!("vnc",        "VNC password authentication",              5900, VncProtocol);
-        reg!("rsh",        "RSH remote shell authentication",          514,  RshProtocol);
-        reg!("rexec",      "Rexec remote execution authentication",    512,  RexecProtocol);
+        reg!("ldap", "LDAP simple bind authentication", 389, LdapProtocol);
+        reg!(
+            "snmp",
+            "SNMPv1/v2c community string brute-force",
+            161,
+            SnmpProtocol
+        );
+        reg!("smb", "SMB2 NTLMv2 challenge-response", 445, SmbProtocol);
+        reg!("rdp", "RDP NLA/Classic authentication", 3389, RdpProtocol);
+        reg!("vnc", "VNC password authentication", 5900, VncProtocol);
+        reg!("rsh", "RSH remote shell authentication", 514, RshProtocol);
+        reg!(
+            "rexec",
+            "Rexec remote execution authentication",
+            512,
+            RexecProtocol
+        );
         // Databases
-        reg!("mysql",      "MySQL native password authentication",     3306,  MySqlProtocol);
-        reg!("postgres",   "PostgreSQL MD5/SCRAM authentication",      5432,  PostgresProtocol);
-        reg!("redis",      "Redis AUTH command",                       6379,  RedisProtocol);
-        reg!("mssql",      "Microsoft SQL Server authentication",      1433,  MssqlProtocol);
-        reg!("mongodb",    "MongoDB SCRAM-SHA-1/256 authentication",   27017, MongoDbProtocol);
-        reg!("memcached",  "Memcached SASL authentication",            11211, MemcachedProtocol);
-        reg!("oracle",     "Oracle TNS authentication",                1521,  OracleProtocol);
-        reg!("firebird",   "Firebird database authentication",         3050,  FirebirdProtocol);
+        reg!(
+            "mysql",
+            "MySQL native password authentication",
+            3306,
+            MySqlProtocol
+        );
+        reg!(
+            "postgres",
+            "PostgreSQL MD5/SCRAM authentication",
+            5432,
+            PostgresProtocol
+        );
+        reg!("redis", "Redis AUTH command", 6379, RedisProtocol);
+        reg!(
+            "mssql",
+            "Microsoft SQL Server authentication",
+            1433,
+            MssqlProtocol
+        );
+        reg!(
+            "mongodb",
+            "MongoDB SCRAM-SHA-1/256 authentication",
+            27017,
+            MongoDbProtocol
+        );
+        reg!(
+            "memcached",
+            "Memcached SASL authentication",
+            11211,
+            MemcachedProtocol
+        );
+        reg!("oracle", "Oracle TNS authentication", 1521, OracleProtocol);
+        reg!(
+            "firebird",
+            "Firebird database authentication",
+            3050,
+            FirebirdProtocol
+        );
 
         r
     }
 }
 
 impl Default for FactoryRegistry {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -390,7 +511,11 @@ pub struct ProbeCommand {
 
 impl ProbeCommand {
     pub fn new(target: Target, credential: Credential, handler: Box<dyn ProbeHandler>) -> Self {
-        Self { target, credential, handler }
+        Self {
+            target,
+            credential,
+            handler,
+        }
     }
 
     pub async fn execute(&self) -> ProbeOutcome {
@@ -418,80 +543,106 @@ pub struct AuthProbeFactory;
 impl AuthProbeFactory {
     pub fn ssh() -> Box<dyn ProbeHandler> {
         Box::new(ProtocolProbeHandler::new(
-            Arc::new(crate::proto::SshProtocol), "ssh",
-            "SSH-2 password authentication via russh", 22,
+            Arc::new(crate::proto::SshProtocol),
+            "ssh",
+            "SSH-2 password authentication via russh",
+            22,
         ))
     }
     pub fn ftp() -> Box<dyn ProbeHandler> {
         Box::new(ProtocolProbeHandler::new(
-            Arc::new(crate::proto::FtpProtocol), "ftp",
-            "FTP username/password authentication", 21,
+            Arc::new(crate::proto::FtpProtocol),
+            "ftp",
+            "FTP username/password authentication",
+            21,
         ))
     }
     pub fn http() -> Box<dyn ProbeHandler> {
         Box::new(ProtocolProbeHandler::new(
-            Arc::new(crate::proto::HttpProtocol::default()), "http",
-            "HTTP Basic/Form authentication", 80,
+            Arc::new(crate::proto::HttpProtocol::default()),
+            "http",
+            "HTTP Basic/Form authentication",
+            80,
         ))
     }
     pub fn http_form() -> Box<dyn ProbeHandler> {
         Box::new(ProtocolProbeHandler::new(
-            Arc::new(crate::proto::HttpFormProtocol::default()), "http-form",
-            "HTTP HTML form brute-force", 80,
+            Arc::new(crate::proto::HttpFormProtocol::default()),
+            "http-form",
+            "HTTP HTML form brute-force",
+            80,
         ))
     }
     pub fn smtp() -> Box<dyn ProbeHandler> {
         Box::new(ProtocolProbeHandler::new(
-            Arc::new(crate::proto::SmtpProtocol), "smtp",
-            "SMTP AUTH LOGIN/PLAIN", 25,
+            Arc::new(crate::proto::SmtpProtocol),
+            "smtp",
+            "SMTP AUTH LOGIN/PLAIN",
+            25,
         ))
     }
     pub fn pop3() -> Box<dyn ProbeHandler> {
         Box::new(ProtocolProbeHandler::new(
-            Arc::new(crate::proto::Pop3Protocol), "pop3",
-            "POP3 USER/PASS authentication", 110,
+            Arc::new(crate::proto::Pop3Protocol),
+            "pop3",
+            "POP3 USER/PASS authentication",
+            110,
         ))
     }
     pub fn imap() -> Box<dyn ProbeHandler> {
         Box::new(ProtocolProbeHandler::new(
-            Arc::new(crate::proto::ImapProtocol), "imap",
-            "IMAP LOGIN authentication", 143,
+            Arc::new(crate::proto::ImapProtocol),
+            "imap",
+            "IMAP LOGIN authentication",
+            143,
         ))
     }
     pub fn telnet() -> Box<dyn ProbeHandler> {
         Box::new(ProtocolProbeHandler::new(
-            Arc::new(crate::proto::TelnetProtocol), "telnet",
-            "Telnet login prompt brute-force", 23,
+            Arc::new(crate::proto::TelnetProtocol),
+            "telnet",
+            "Telnet login prompt brute-force",
+            23,
         ))
     }
     pub fn smb() -> Box<dyn ProbeHandler> {
         Box::new(ProtocolProbeHandler::new(
-            Arc::new(crate::proto::SmbProtocol), "smb",
-            "SMB2 NTLMv2 challenge-response", 445,
+            Arc::new(crate::proto::SmbProtocol),
+            "smb",
+            "SMB2 NTLMv2 challenge-response",
+            445,
         ))
     }
     pub fn ldap() -> Box<dyn ProbeHandler> {
         Box::new(ProtocolProbeHandler::new(
-            Arc::new(crate::proto::LdapProtocol), "ldap",
-            "LDAP simple bind authentication", 389,
+            Arc::new(crate::proto::LdapProtocol),
+            "ldap",
+            "LDAP simple bind authentication",
+            389,
         ))
     }
     pub fn rdp() -> Box<dyn ProbeHandler> {
         Box::new(ProtocolProbeHandler::new(
-            Arc::new(crate::proto::RdpProtocol), "rdp",
-            "RDP NLA/Classic authentication", 3389,
+            Arc::new(crate::proto::RdpProtocol),
+            "rdp",
+            "RDP NLA/Classic authentication",
+            3389,
         ))
     }
     pub fn vnc() -> Box<dyn ProbeHandler> {
         Box::new(ProtocolProbeHandler::new(
-            Arc::new(crate::proto::VncProtocol), "vnc",
-            "VNC password authentication", 5900,
+            Arc::new(crate::proto::VncProtocol),
+            "vnc",
+            "VNC password authentication",
+            5900,
         ))
     }
     pub fn snmp() -> Box<dyn ProbeHandler> {
         Box::new(ProtocolProbeHandler::new(
-            Arc::new(crate::proto::SnmpProtocol), "snmp",
-            "SNMPv1/v2c community string brute-force", 161,
+            Arc::new(crate::proto::SnmpProtocol),
+            "snmp",
+            "SNMPv1/v2c community string brute-force",
+            161,
         ))
     }
 }
@@ -506,50 +657,66 @@ pub struct DatabaseProbeFactory;
 impl DatabaseProbeFactory {
     pub fn mysql() -> Box<dyn ProbeHandler> {
         Box::new(ProtocolProbeHandler::new(
-            Arc::new(crate::database::MySqlProtocol), "mysql",
-            "MySQL native password authentication", 3306,
+            Arc::new(crate::database::MySqlProtocol),
+            "mysql",
+            "MySQL native password authentication",
+            3306,
         ))
     }
     pub fn postgres() -> Box<dyn ProbeHandler> {
         Box::new(ProtocolProbeHandler::new(
-            Arc::new(crate::database::PostgresProtocol), "postgres",
-            "PostgreSQL MD5/SCRAM authentication", 5432,
+            Arc::new(crate::database::PostgresProtocol),
+            "postgres",
+            "PostgreSQL MD5/SCRAM authentication",
+            5432,
         ))
     }
     pub fn redis() -> Box<dyn ProbeHandler> {
         Box::new(ProtocolProbeHandler::new(
-            Arc::new(crate::database::RedisProtocol), "redis",
-            "Redis AUTH command", 6379,
+            Arc::new(crate::database::RedisProtocol),
+            "redis",
+            "Redis AUTH command",
+            6379,
         ))
     }
     pub fn mssql() -> Box<dyn ProbeHandler> {
         Box::new(ProtocolProbeHandler::new(
-            Arc::new(crate::database::MssqlProtocol), "mssql",
-            "Microsoft SQL Server authentication", 1433,
+            Arc::new(crate::database::MssqlProtocol),
+            "mssql",
+            "Microsoft SQL Server authentication",
+            1433,
         ))
     }
     pub fn mongodb() -> Box<dyn ProbeHandler> {
         Box::new(ProtocolProbeHandler::new(
-            Arc::new(crate::database::MongoDbProtocol), "mongodb",
-            "MongoDB SCRAM-SHA-1/256 authentication", 27017,
+            Arc::new(crate::database::MongoDbProtocol),
+            "mongodb",
+            "MongoDB SCRAM-SHA-1/256 authentication",
+            27017,
         ))
     }
     pub fn memcached() -> Box<dyn ProbeHandler> {
         Box::new(ProtocolProbeHandler::new(
-            Arc::new(crate::database::MemcachedProtocol), "memcached",
-            "Memcached SASL authentication", 11211,
+            Arc::new(crate::database::MemcachedProtocol),
+            "memcached",
+            "Memcached SASL authentication",
+            11211,
         ))
     }
     pub fn oracle() -> Box<dyn ProbeHandler> {
         Box::new(ProtocolProbeHandler::new(
-            Arc::new(crate::database::OracleProtocol), "oracle",
-            "Oracle TNS authentication", 1521,
+            Arc::new(crate::database::OracleProtocol),
+            "oracle",
+            "Oracle TNS authentication",
+            1521,
         ))
     }
     pub fn firebird() -> Box<dyn ProbeHandler> {
         Box::new(ProtocolProbeHandler::new(
-            Arc::new(crate::database::FirebirdProtocol), "firebird",
-            "Firebird database authentication", 3050,
+            Arc::new(crate::database::FirebirdProtocol),
+            "firebird",
+            "Firebird database authentication",
+            3050,
         ))
     }
 }
@@ -566,10 +733,17 @@ mod tests {
 
     #[async_trait]
     impl Protocol for DummyProto {
-        fn name(&self) -> &'static str { "dummy" }
-        fn default_port(&self) -> u16 { 9999 }
+        fn name(&self) -> &'static str {
+            "dummy"
+        }
+        fn default_port(&self) -> u16 {
+            9999
+        }
         async fn authenticate(
-            &self, _: &Target, _: &Credential, _: &AttackConfig,
+            &self,
+            _: &Target,
+            _: &Credential,
+            _: &AttackConfig,
         ) -> Result<AttackResult, ZeusError> {
             Ok(AttackResult::Failure)
         }
@@ -626,7 +800,11 @@ mod tests {
         let infos = reg.list_protocols();
         let names: Vec<&str> = infos.iter().map(|i| i.name.as_str()).collect();
         for expected in &["http", "ftp", "mysql", "redis", "pop3", "imap"] {
-            assert!(names.contains(expected), "expected '{}' in list_protocols", expected);
+            assert!(
+                names.contains(expected),
+                "expected '{}' in list_protocols",
+                expected
+            );
         }
     }
 
@@ -664,7 +842,10 @@ mod tests {
         let reg = FactoryRegistry::new();
         reg.register("dummy", || {
             Box::new(ProtocolProbeHandler::new(
-                Arc::new(DummyProto), "dummy", "A dummy protocol", 9999,
+                Arc::new(DummyProto),
+                "dummy",
+                "A dummy protocol",
+                9999,
             ))
         });
         let h = reg.create("dummy").expect("dummy should be registered");
@@ -681,8 +862,22 @@ mod tests {
     #[test]
     fn factory_registry_protocols_sorted() {
         let reg = FactoryRegistry::new();
-        reg.register("zzz", || Box::new(ProtocolProbeHandler::new(Arc::new(DummyProto), "zzz", "", 1)));
-        reg.register("aaa", || Box::new(ProtocolProbeHandler::new(Arc::new(DummyProto), "aaa", "", 2)));
+        reg.register("zzz", || {
+            Box::new(ProtocolProbeHandler::new(
+                Arc::new(DummyProto),
+                "zzz",
+                "",
+                1,
+            ))
+        });
+        reg.register("aaa", || {
+            Box::new(ProtocolProbeHandler::new(
+                Arc::new(DummyProto),
+                "aaa",
+                "",
+                2,
+            ))
+        });
         let p = reg.protocols();
         let mut sorted = p.clone();
         sorted.sort_unstable();
@@ -692,8 +887,14 @@ mod tests {
     #[test]
     fn factory_registry_with_builtins_populated() {
         let reg = FactoryRegistry::with_builtins();
-        for name in &["ssh", "ftp", "smtp", "http", "mysql", "redis", "smb", "ldap"] {
-            assert!(reg.create(name).is_some(), "missing '{}' in FactoryRegistry::with_builtins()", name);
+        for name in &[
+            "ssh", "ftp", "smtp", "http", "mysql", "redis", "smb", "ldap",
+        ] {
+            assert!(
+                reg.create(name).is_some(),
+                "missing '{}' in FactoryRegistry::with_builtins()",
+                name
+            );
         }
         let p = reg.protocols();
         let mut sorted = p.clone();
@@ -714,8 +915,18 @@ mod tests {
 
     #[test]
     fn probe_outcome_is_success() {
-        assert!(ProbeOutcome::Success { message: "ok".into() }.is_success());
-        assert!(!ProbeOutcome::Failure { reason: "bad".into() }.is_success());
+        assert!(
+            ProbeOutcome::Success {
+                message: "ok".into()
+            }
+            .is_success()
+        );
+        assert!(
+            !ProbeOutcome::Failure {
+                reason: "bad".into()
+            }
+            .is_success()
+        );
         assert!(!ProbeOutcome::Timeout.is_success());
         assert!(!ProbeOutcome::Error { detail: "e".into() }.is_success());
     }
@@ -748,23 +959,27 @@ mod tests {
     #[test]
     fn auth_probe_factory_protocols_and_ports() {
         let cases: &[(&str, u16, Box<dyn ProbeHandler>)] = &[
-            ("ssh",    22,   AuthProbeFactory::ssh()),
-            ("ftp",    21,   AuthProbeFactory::ftp()),
-            ("http",   80,   AuthProbeFactory::http()),
-            ("smtp",   25,   AuthProbeFactory::smtp()),
-            ("pop3",   110,  AuthProbeFactory::pop3()),
-            ("imap",   143,  AuthProbeFactory::imap()),
-            ("telnet", 23,   AuthProbeFactory::telnet()),
-            ("smb",    445,  AuthProbeFactory::smb()),
-            ("ldap",   389,  AuthProbeFactory::ldap()),
-            ("rdp",    3389, AuthProbeFactory::rdp()),
-            ("vnc",    5900, AuthProbeFactory::vnc()),
-            ("snmp",   161,  AuthProbeFactory::snmp()),
+            ("ssh", 22, AuthProbeFactory::ssh()),
+            ("ftp", 21, AuthProbeFactory::ftp()),
+            ("http", 80, AuthProbeFactory::http()),
+            ("smtp", 25, AuthProbeFactory::smtp()),
+            ("pop3", 110, AuthProbeFactory::pop3()),
+            ("imap", 143, AuthProbeFactory::imap()),
+            ("telnet", 23, AuthProbeFactory::telnet()),
+            ("smb", 445, AuthProbeFactory::smb()),
+            ("ldap", 389, AuthProbeFactory::ldap()),
+            ("rdp", 3389, AuthProbeFactory::rdp()),
+            ("vnc", 5900, AuthProbeFactory::vnc()),
+            ("snmp", 161, AuthProbeFactory::snmp()),
         ];
         for (name, port, h) in cases {
             assert_eq!(h.protocol(), *name);
             assert_eq!(h.default_port(), *port);
-            assert!(!h.description().is_empty(), "'{}' has empty description", name);
+            assert!(
+                !h.description().is_empty(),
+                "'{}' has empty description",
+                name
+            );
         }
     }
 
@@ -773,19 +988,23 @@ mod tests {
     #[test]
     fn database_probe_factory_protocols_and_ports() {
         let cases: &[(&str, u16, Box<dyn ProbeHandler>)] = &[
-            ("mysql",     3306,  DatabaseProbeFactory::mysql()),
-            ("postgres",  5432,  DatabaseProbeFactory::postgres()),
-            ("redis",     6379,  DatabaseProbeFactory::redis()),
-            ("mssql",     1433,  DatabaseProbeFactory::mssql()),
-            ("mongodb",   27017, DatabaseProbeFactory::mongodb()),
+            ("mysql", 3306, DatabaseProbeFactory::mysql()),
+            ("postgres", 5432, DatabaseProbeFactory::postgres()),
+            ("redis", 6379, DatabaseProbeFactory::redis()),
+            ("mssql", 1433, DatabaseProbeFactory::mssql()),
+            ("mongodb", 27017, DatabaseProbeFactory::mongodb()),
             ("memcached", 11211, DatabaseProbeFactory::memcached()),
-            ("oracle",    1521,  DatabaseProbeFactory::oracle()),
-            ("firebird",  3050,  DatabaseProbeFactory::firebird()),
+            ("oracle", 1521, DatabaseProbeFactory::oracle()),
+            ("firebird", 3050, DatabaseProbeFactory::firebird()),
         ];
         for (name, port, h) in cases {
             assert_eq!(h.protocol(), *name);
             assert_eq!(h.default_port(), *port);
-            assert!(!h.description().is_empty(), "'{}' has empty description", name);
+            assert!(
+                !h.description().is_empty(),
+                "'{}' has empty description",
+                name
+            );
         }
     }
 }

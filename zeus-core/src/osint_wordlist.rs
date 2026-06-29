@@ -50,10 +50,14 @@ pub trait OsintSource: Send + Sync {
 pub struct DomainSource;
 
 impl OsintSource for DomainSource {
-    fn name(&self) -> &'static str { "domain" }
+    fn name(&self) -> &'static str {
+        "domain"
+    }
 
     fn extract(&self, info: &TargetInfo) -> Vec<String> {
-        let Some(ref domain) = info.domain else { return vec![] };
+        let Some(ref domain) = info.domain else {
+            return vec![];
+        };
         // Strip TLD — take the part before the first dot.
         let base = domain.split('.').next().unwrap_or(domain.as_str());
         vec![base.to_string()]
@@ -66,10 +70,14 @@ impl OsintSource for DomainSource {
 pub struct CompanyNameSource;
 
 impl OsintSource for CompanyNameSource {
-    fn name(&self) -> &'static str { "company_name" }
+    fn name(&self) -> &'static str {
+        "company_name"
+    }
 
     fn extract(&self, info: &TargetInfo) -> Vec<String> {
-        let Some(ref name) = info.company_name else { return vec![] };
+        let Some(ref name) = info.company_name else {
+            return vec![];
+        };
         let mut bases = vec![name.clone()];
         // Also add a lowercase, whitespace-stripped concatenation.
         let compact: String = name.split_whitespace().collect::<String>().to_lowercase();
@@ -84,7 +92,9 @@ impl OsintSource for CompanyNameSource {
 pub struct KeywordSource;
 
 impl OsintSource for KeywordSource {
-    fn name(&self) -> &'static str { "keywords" }
+    fn name(&self) -> &'static str {
+        "keywords"
+    }
 
     fn extract(&self, info: &TargetInfo) -> Vec<String> {
         info.keywords.clone()
@@ -278,7 +288,11 @@ mod tests {
     #[test]
     fn domain_source_strips_tld() {
         let src = DomainSource;
-        let info = TargetInfo { domain: Some("acme.com".into()), year: 2024, ..Default::default() };
+        let info = TargetInfo {
+            domain: Some("acme.com".into()),
+            year: 2024,
+            ..Default::default()
+        };
         let bases = src.extract(&info);
         assert_eq!(bases, vec!["acme"]);
     }
@@ -337,9 +351,7 @@ mod tests {
 
     #[test]
     fn to_credentials_cross_product() {
-        let list = OsintWordlistBuilder::new()
-            .with_keyword("pass")
-            .build();
+        let list = OsintWordlistBuilder::new().with_keyword("pass").build();
         let usernames = vec!["admin".to_string(), "root".to_string()];
         let creds = list.to_credentials(&usernames);
         // Each username × each word.
@@ -350,7 +362,9 @@ mod tests {
     fn custom_source_plugged_in_via_add_source() {
         struct StaticSource;
         impl OsintSource for StaticSource {
-            fn name(&self) -> &'static str { "static" }
+            fn name(&self) -> &'static str {
+                "static"
+            }
             fn extract(&self, _: &TargetInfo) -> Vec<String> {
                 vec!["custom_base".to_string()]
             }

@@ -109,11 +109,7 @@ pub struct CheckpointManager {
 }
 
 impl CheckpointManager {
-    pub fn new(
-        checkpoint: AttackCheckpoint,
-        path: impl Into<PathBuf>,
-        save_every_n: u64,
-    ) -> Self {
+    pub fn new(checkpoint: AttackCheckpoint, path: impl Into<PathBuf>, save_every_n: u64) -> Self {
         let save_every_n = save_every_n.max(1);
         Self {
             last_save_at: checkpoint.attempts_done,

@@ -4,7 +4,7 @@
 //! construction, plus helpers for HEAD requests, custom headers, Digest auth,
 //! NTLM probing, CSRF extraction, and HTML form field parsing.
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use md5::{Digest as Md5Digest, Md5};
 use std::collections::HashMap;
 use std::time::Duration;
@@ -135,7 +135,10 @@ impl HttpClientBuilder {
             .build()
             .map_err(|e| anyhow!("failed to build HTTP client: {e}"))?;
 
-        Ok(HttpClient { inner, base_url: self.base_url })
+        Ok(HttpClient {
+            inner,
+            base_url: self.base_url,
+        })
     }
 }
 
@@ -186,14 +189,15 @@ impl HttpClient {
     /// POST URL-encoded form fields to `path`.
     ///
     /// Returns `(status_code, body_text)`.
-    pub async fn post_form(
-        &self,
-        path: &str,
-        fields: &[(&str, &str)],
-    ) -> Result<(u16, String)> {
+    pub async fn post_form(&self, path: &str, fields: &[(&str, &str)]) -> Result<(u16, String)> {
         let url = self.url(path);
         debug!("POST form -> {url}");
-        let resp = self.inner.post(&url).form(fields).send().await
+        let resp = self
+            .inner
+            .post(&url)
+            .form(fields)
+            .send()
+            .await
             .map_err(|e| anyhow!("POST form to {url}: {e}"))?;
         let status = resp.status().as_u16();
         let body = resp.text().await.unwrap_or_default();
@@ -212,7 +216,9 @@ impl HttpClient {
     ) -> Result<(u16, String)> {
         let url = self.url(path);
         debug!("GET basic-auth -> {url} (user={user})");
-        let resp = self.inner.get(&url)
+        let resp = self
+            .inner
+            .get(&url)
             .basic_auth(user, Some(pass))
             .send()
             .await
@@ -226,14 +232,15 @@ impl HttpClient {
     /// POST a JSON body to `path`.
     ///
     /// Returns `(status_code, body_text)`.
-    pub async fn post_json(
-        &self,
-        path: &str,
-        body: serde_json::Value,
-    ) -> Result<(u16, String)> {
+    pub async fn post_json(&self, path: &str, body: serde_json::Value) -> Result<(u16, String)> {
         let url = self.url(path);
         debug!("POST json -> {url}");
-        let resp = self.inner.post(&url).json(&body).send().await
+        let resp = self
+            .inner
+            .post(&url)
+            .json(&body)
+            .send()
+            .await
             .map_err(|e| anyhow!("POST json to {url}: {e}"))?;
         let status = resp.status().as_u16();
         let text = resp.text().await.unwrap_or_default();
@@ -247,7 +254,11 @@ impl HttpClient {
     pub async fn head(&self, path: &str) -> Result<u16> {
         let url = self.url(path);
         debug!("HEAD -> {url}");
-        let resp = self.inner.head(&url).send().await
+        let resp = self
+            .inner
+            .head(&url)
+            .send()
+            .await
             .map_err(|e| anyhow!("HEAD to {url}: {e}"))?;
         let status = resp.status().as_u16();
         debug!("HEAD <- {status}");
@@ -258,7 +269,9 @@ impl HttpClient {
     pub async fn head_basic_auth(&self, path: &str, user: &str, pass: &str) -> Result<u16> {
         let url = self.url(path);
         debug!("HEAD basic-auth -> {url} (user={user})");
-        let resp = self.inner.head(&url)
+        let resp = self
+            .inner
+            .head(&url)
             .basic_auth(user, Some(pass))
             .send()
             .await
@@ -282,7 +295,9 @@ impl HttpClient {
         for (k, v) in headers {
             req = req.header(k.as_str(), v.as_str());
         }
-        let resp = req.send().await
+        let resp = req
+            .send()
+            .await
             .map_err(|e| anyhow!("GET with headers to {url}: {e}"))?;
         let status = resp.status().as_u16();
         let body = resp.text().await.unwrap_or_default();
@@ -302,7 +317,9 @@ impl HttpClient {
         for (k, v) in headers {
             req = req.header(k.as_str(), v.as_str());
         }
-        let resp = req.send().await
+        let resp = req
+            .send()
+            .await
             .map_err(|e| anyhow!("POST form with headers to {url}: {e}"))?;
         let status = resp.status().as_u16();
         let body = resp.text().await.unwrap_or_default();
@@ -326,7 +343,11 @@ impl HttpClient {
         debug!("GET digest-auth -> {url} (user={user})");
 
         // Step 1: unauthenticated GET to receive the 401 challenge
-        let challenge = self.inner.get(&url).send().await
+        let challenge = self
+            .inner
+            .get(&url)
+            .send()
+            .await
             .map_err(|e| anyhow!("GET digest challenge to {url}: {e}"))?;
 
         if challenge.status() != 401 {
@@ -342,14 +363,14 @@ impl HttpClient {
             .unwrap_or("")
             .to_owned();
 
-        let realm  = extract_param(&www_auth, "realm").unwrap_or_default();
-        let nonce  = extract_param(&www_auth, "nonce").unwrap_or_default();
-        let _qop   = extract_param(&www_auth, "qop").unwrap_or_default();
+        let realm = extract_param(&www_auth, "realm").unwrap_or_default();
+        let nonce = extract_param(&www_auth, "nonce").unwrap_or_default();
+        let _qop = extract_param(&www_auth, "qop").unwrap_or_default();
 
         // Compute Digest per RFC 2617 §3.2.2
         let ha1 = md5_hex(&format!("{}:{}:{}", user, realm, pass));
         let ha2 = md5_hex(&format!("GET:{}", path));
-        let nc     = "00000001";
+        let nc = "00000001";
         let cnonce = "zeus1234";
         let response_hash = md5_hex(&format!("{}:{}:{}:{}:auth:{}", ha1, nonce, nc, cnonce, ha2));
 
@@ -359,7 +380,9 @@ impl HttpClient {
         );
 
         debug!("GET digest-auth (step 2) -> {url}");
-        let resp = self.inner.get(&url)
+        let resp = self
+            .inner
+            .get(&url)
             .header("Authorization", auth_header)
             .send()
             .await
@@ -379,18 +402,18 @@ impl HttpClient {
     pub async fn probe_ntlm(&self, path: &str) -> Result<bool> {
         let url = self.url(path);
         debug!("NTLM probe -> {url}");
-        let resp = self.inner.head(&url).send().await
+        let resp = self
+            .inner
+            .head(&url)
+            .send()
+            .await
             .map_err(|e| anyhow!("NTLM probe to {url}: {e}"))?;
 
-        let has_ntlm = resp
-            .headers()
-            .get_all("WWW-Authenticate")
-            .iter()
-            .any(|v| {
-                v.to_str()
-                    .map(|s| s.to_ascii_uppercase().contains("NTLM"))
-                    .unwrap_or(false)
-            });
+        let has_ntlm = resp.headers().get_all("WWW-Authenticate").iter().any(|v| {
+            v.to_str()
+                .map(|s| s.to_ascii_uppercase().contains("NTLM"))
+                .unwrap_or(false)
+        });
 
         debug!("NTLM probe <- ntlm={has_ntlm}");
         Ok(has_ntlm)
@@ -556,7 +579,10 @@ mod tests {
     #[test]
     fn is_failure_detects_any_match() {
         let c = client();
-        assert!(c.is_failure("Invalid password, try again", &["Invalid password", "error"]));
+        assert!(c.is_failure(
+            "Invalid password, try again",
+            &["Invalid password", "error"]
+        ));
         assert!(!c.is_failure("Welcome back!", &["Invalid password", "error"]));
     }
 
@@ -625,7 +651,7 @@ mod tests {
         let header = r#"Digest realm="example.com", nonce="abc123", qop="auth""#;
         assert_eq!(extract_param(header, "realm"), Some("example.com".into()));
         assert_eq!(extract_param(header, "nonce"), Some("abc123".into()));
-        assert_eq!(extract_param(header, "qop"),   Some("auth".into()));
+        assert_eq!(extract_param(header, "qop"), Some("auth".into()));
     }
 
     #[test]
@@ -671,7 +697,10 @@ mod tests {
     #[test]
     fn extract_csrf_token_meta_tag() {
         let html = r#"<meta name="csrf-token" content="meta_tok_42">"#;
-        assert_eq!(HttpClient::extract_csrf_token(html), Some("meta_tok_42".into()));
+        assert_eq!(
+            HttpClient::extract_csrf_token(html),
+            Some("meta_tok_42".into())
+        );
     }
 
     #[test]
@@ -683,7 +712,7 @@ mod tests {
     #[test]
     fn extract_attr_quoted() {
         let tag = r#"<input name="user" value="alice">"#;
-        assert_eq!(extract_attr(tag, "name"),  Some("user".into()));
+        assert_eq!(extract_attr(tag, "name"), Some("user".into()));
         assert_eq!(extract_attr(tag, "value"), Some("alice".into()));
     }
 

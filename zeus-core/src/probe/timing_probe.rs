@@ -12,8 +12,8 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::Mutex;
 use thiserror::Error;
+use tokio::sync::Mutex;
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Error
@@ -105,7 +105,10 @@ impl TimingProbe {
         let means: HashMap<&String, f64> = eligible
             .iter()
             .map(|(u, samples)| {
-                let mean = samples.iter().map(|d| d.as_secs_f64() * 1000.0).sum::<f64>()
+                let mean = samples
+                    .iter()
+                    .map(|d| d.as_secs_f64() * 1000.0)
+                    .sum::<f64>()
                     / samples.len() as f64;
                 (*u, mean)
             })
@@ -124,7 +127,10 @@ impl TimingProbe {
                 continue;
             }
             let baseline_mean = others.iter().sum::<f64>() / others.len() as f64;
-            let variance = others.iter().map(|&m| (m - baseline_mean).powi(2)).sum::<f64>()
+            let variance = others
+                .iter()
+                .map(|&m| (m - baseline_mean).powi(2))
+                .sum::<f64>()
                 / others.len() as f64;
             let baseline_std = variance.sqrt();
             let sigma_above = if baseline_std > 0.0 {
@@ -148,7 +154,11 @@ impl TimingProbe {
         }
 
         // Sort descending by sigma so highest-confidence hits appear first.
-        findings.sort_by(|a, b| b.sigma_above_baseline.partial_cmp(&a.sigma_above_baseline).unwrap());
+        findings.sort_by(|a, b| {
+            b.sigma_above_baseline
+                .partial_cmp(&a.sigma_above_baseline)
+                .unwrap()
+        });
         findings
     }
 
@@ -207,8 +217,7 @@ impl PasswordSpray {
         let mut bucket = self.bucket.lock().await;
         let elapsed = bucket.last_refill.elapsed();
         let day_secs = 86_400_f64;
-        let accrued =
-            (elapsed.as_secs_f64() / day_secs * self.requests_per_day as f64) as u64;
+        let accrued = (elapsed.as_secs_f64() / day_secs * self.requests_per_day as f64) as u64;
         if accrued > 0 {
             bucket.tokens = (bucket.tokens + accrued).min(self.requests_per_day);
             bucket.last_refill = std::time::Instant::now();
@@ -278,15 +287,22 @@ mod tests {
             }
         }
         let findings = probe.analyze().await;
-        assert!(findings.is_empty(), "uniform latency should produce no findings");
+        assert!(
+            findings.is_empty(),
+            "uniform latency should produce no findings"
+        );
     }
 
     #[tokio::test]
     async fn timing_probe_respects_min_samples() {
         let probe = TimingProbe::new(5, 2.0);
         // Only 2 samples — below min_samples.
-        probe.observe("sparse_user", Duration::from_millis(500)).await;
-        probe.observe("sparse_user", Duration::from_millis(500)).await;
+        probe
+            .observe("sparse_user", Duration::from_millis(500))
+            .await;
+        probe
+            .observe("sparse_user", Duration::from_millis(500))
+            .await;
         let findings = probe.analyze().await;
         assert!(findings.is_empty());
     }

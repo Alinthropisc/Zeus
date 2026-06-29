@@ -10,16 +10,24 @@ pub struct DictionaryStrategy {
 
 impl DictionaryStrategy {
     pub fn new(usernames: Vec<String>, wordlist: Wordlist) -> Self {
-        Self { usernames, wordlist }
+        Self {
+            usernames,
+            wordlist,
+        }
     }
 
     pub fn credential_pairs(wordlist: Wordlist) -> Self {
-        Self { usernames: vec![], wordlist }
+        Self {
+            usernames: vec![],
+            wordlist,
+        }
     }
 }
 
 impl AttackStrategy for DictionaryStrategy {
-    fn name(&self) -> &'static str { "dictionary" }
+    fn name(&self) -> &'static str {
+        "dictionary"
+    }
 
     fn credentials(&self) -> CredentialStream {
         if self.usernames.is_empty() {
@@ -35,7 +43,11 @@ impl AttackStrategy for DictionaryStrategy {
     }
 
     fn estimated_count(&self) -> Option<u64> {
-        let factor = if self.usernames.is_empty() { 1 } else { self.usernames.len() };
+        let factor = if self.usernames.is_empty() {
+            1
+        } else {
+            self.usernames.len()
+        };
         Some((self.wordlist.len() * factor) as u64)
     }
 }

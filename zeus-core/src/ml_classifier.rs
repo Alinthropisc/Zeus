@@ -86,14 +86,30 @@ pub struct ResponseFeatures {
 }
 
 const SUCCESS_KEYWORDS: &[&str] = &[
-    "welcome", "dashboard", "logged in", "logout", "sign out",
-    "my account", "profile", "hello,", "home", "success",
+    "welcome",
+    "dashboard",
+    "logged in",
+    "logout",
+    "sign out",
+    "my account",
+    "profile",
+    "hello,",
+    "home",
+    "success",
 ];
 
 const FAILURE_KEYWORDS: &[&str] = &[
-    "invalid", "incorrect", "wrong password", "bad credentials",
-    "authentication failed", "login failed", "access denied",
-    "try again", "error", "unauthorized", "forbidden",
+    "invalid",
+    "incorrect",
+    "wrong password",
+    "bad credentials",
+    "authentication failed",
+    "login failed",
+    "access denied",
+    "try again",
+    "error",
+    "unauthorized",
+    "forbidden",
 ];
 
 // ---------------------------------------------------------------------------
@@ -120,11 +136,7 @@ pub trait ResponseClassifier: Send + Sync {
         let signals = self.score_features(&features);
 
         // Weighted sum over matched signals only.
-        let raw_score: f32 = signals
-            .iter()
-            .filter(|s| s.matched)
-            .map(|s| s.weight)
-            .sum();
+        let raw_score: f32 = signals.iter().filter(|s| s.matched).map(|s| s.weight).sum();
 
         // Normalise to [0,1] range where 0.5 is the uncertainty boundary.
         // We map raw_score ∈ (-∞, +∞) via a sigmoid-like clamp.
@@ -138,7 +150,11 @@ pub trait ResponseClassifier: Send + Sync {
             ClassificationLabel::Uncertain
         };
 
-        ClassificationResult { label, confidence, signals }
+        ClassificationResult {
+            label,
+            confidence,
+            signals,
+        }
     }
 }
 
@@ -279,25 +295,25 @@ impl NaiveBayesClassifier {
     /// common web authentication page patterns.
     pub fn with_defaults() -> Self {
         let success_words: &[(&str, f32)] = &[
-            ("welcome",   0.90),
+            ("welcome", 0.90),
             ("dashboard", 0.92),
-            ("logout",    0.88),
-            ("profile",   0.80),
-            ("account",   0.75),
-            ("hello",     0.70),
-            ("success",   0.80),
-            ("home",      0.65),
-            ("authorized",0.85),
+            ("logout", 0.88),
+            ("profile", 0.80),
+            ("account", 0.75),
+            ("hello", 0.70),
+            ("success", 0.80),
+            ("home", 0.65),
+            ("authorized", 0.85),
         ];
         let failure_words: &[(&str, f32)] = &[
-            ("invalid",   0.92),
+            ("invalid", 0.92),
             ("incorrect", 0.90),
-            ("failed",    0.88),
-            ("denied",    0.87),
-            ("wrong",     0.85),
-            ("error",     0.75),
-            ("retry",     0.80),
-            ("locked",    0.82),
+            ("failed", 0.88),
+            ("denied", 0.87),
+            ("wrong", 0.85),
+            ("error", 0.75),
+            ("retry", 0.80),
+            ("locked", 0.82),
             ("forbidden", 0.88),
             ("unauthorized", 0.90),
         ];
@@ -375,7 +391,11 @@ impl ResponseClassifier for NaiveBayesClassifier {
             ClassificationLabel::Uncertain
         };
 
-        ClassificationResult { label, confidence, signals }
+        ClassificationResult {
+            label,
+            confidence,
+            signals,
+        }
     }
 }
 
@@ -390,10 +410,9 @@ mod tests {
     fn success_response() -> RawResponse {
         RawResponse {
             status_code: Some(200),
-            body: "Welcome back! You are now logged in. <a href='/logout'>logout</a> dashboard".into(),
-            headers: vec![
-                ("Set-Cookie".into(), "session_id=abc123; Path=/".into()),
-            ],
+            body: "Welcome back! You are now logged in. <a href='/logout'>logout</a> dashboard"
+                .into(),
+            headers: vec![("Set-Cookie".into(), "session_id=abc123; Path=/".into())],
             elapsed_ms: 120,
             redirect_count: 0,
         }

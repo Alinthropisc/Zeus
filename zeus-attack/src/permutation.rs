@@ -76,7 +76,9 @@ impl PermutationStrategy {
 }
 
 impl AttackStrategy for PermutationStrategy {
-    fn name(&self) -> &'static str { "permutation" }
+    fn name(&self) -> &'static str {
+        "permutation"
+    }
 
     fn credentials(&self) -> CredentialStream {
         Box::pin(iter(self.generate_all()))
@@ -211,7 +213,9 @@ impl LeetStrategy {
 }
 
 impl AttackStrategy for LeetStrategy {
-    fn name(&self) -> &'static str { "leet" }
+    fn name(&self) -> &'static str {
+        "leet"
+    }
 
     fn credentials(&self) -> CredentialStream {
         let username = self.username.clone();
@@ -220,8 +224,7 @@ impl AttackStrategy for LeetStrategy {
         let stream = futures::stream::iter(words).flat_map(move |word| {
             let variants = leet_substitutions(&word);
             let user = username.clone();
-            futures::stream::iter(variants)
-                .map(move |pw| Credential::new(user.clone(), pw))
+            futures::stream::iter(variants).map(move |pw| Credential::new(user.clone(), pw))
         });
 
         Box::pin(stream)
@@ -229,20 +232,24 @@ impl AttackStrategy for LeetStrategy {
 
     fn estimated_count(&self) -> Option<u64> {
         // Upper bound: product of options per char, summed over all words.
-        let total: u64 = self.words.iter().map(|word| {
-            let chars: Vec<char> = word.chars().collect();
-            let mut product: u64 = 1;
-            for &ch in &chars {
-                let lower = ch.to_lowercase().next().unwrap_or(ch);
-                let count = LEET_TABLE
-                    .iter()
-                    .find(|&&(src, _)| src == lower)
-                    .map(|&(_, replacements)| (replacements.len() + 1) as u64)
-                    .unwrap_or(1);
-                product = product.saturating_mul(count);
-            }
-            product
-        }).sum();
+        let total: u64 = self
+            .words
+            .iter()
+            .map(|word| {
+                let chars: Vec<char> = word.chars().collect();
+                let mut product: u64 = 1;
+                for &ch in &chars {
+                    let lower = ch.to_lowercase().next().unwrap_or(ch);
+                    let count = LEET_TABLE
+                        .iter()
+                        .find(|&&(src, _)| src == lower)
+                        .map(|&(_, replacements)| (replacements.len() + 1) as u64)
+                        .unwrap_or(1);
+                    product = product.saturating_mul(count);
+                }
+                product
+            })
+            .sum();
         Some(total)
     }
 }
@@ -259,7 +266,10 @@ mod leet_tests {
     #[test]
     fn leet_includes_original() {
         let variants = leet_substitutions("abc");
-        assert!(variants.contains(&"abc".to_owned()), "original must be included");
+        assert!(
+            variants.contains(&"abc".to_owned()),
+            "original must be included"
+        );
     }
 
     #[test]

@@ -7,10 +7,10 @@
 
 use std::path::Path;
 
-use anyhow::Result;
 use crate::output::builder::ReportBuilder;
 use crate::output::finding::Finding;
 use crate::output::renderer::{JsonRenderer, ReportRenderer};
+use anyhow::Result;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ProbeRunner

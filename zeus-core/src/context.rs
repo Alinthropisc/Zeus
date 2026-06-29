@@ -209,7 +209,7 @@ impl Clone for ZeusContext {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{credential_store::FoundCredential, Credential};
+    use crate::{Credential, credential_store::FoundCredential};
 
     fn found(user: &str, pass: &str, target: &str) -> FoundCredential {
         FoundCredential::new(Credential::new(user, pass), target, "ssh", 0)

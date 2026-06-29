@@ -5,18 +5,22 @@
 //! contains device-specific strings ("Adam", "ADAM", or "Advantech").
 //! An HTTP 401 means the credentials were rejected.
 
+use crate::net::HttpClient;
 use async_trait::async_trait;
 use std::time::Instant;
 use tracing::debug;
 use zeus_core::{AttackConfig, AttackResult, Credential, Protocol, Target, ZeusError};
-use crate::net::HttpClient;
 
 pub struct Adam6500Protocol;
 
 #[async_trait]
 impl Protocol for Adam6500Protocol {
-    fn name(&self) -> &'static str { "adam6500" }
-    fn default_port(&self) -> u16 { 80 }
+    fn name(&self) -> &'static str {
+        "adam6500"
+    }
+    fn default_port(&self) -> u16 {
+        80
+    }
     fn description(&self) -> &'static str {
         "Advantech Adam 6500 series I/O module HTTP authentication"
     }
@@ -34,7 +38,11 @@ impl Protocol for Adam6500Protocol {
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
 
         // Primary probe path; fall back to /Adam/index.html if the option is set.
-        let path = target.options.get("path").map(String::as_str).unwrap_or("/");
+        let path = target
+            .options
+            .get("path")
+            .map(String::as_str)
+            .unwrap_or("/");
 
         debug!("Adam6500 GET {} as {}", path, cred.username);
 

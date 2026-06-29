@@ -6,27 +6,27 @@
 //!   Client → LOGIN7 packet    (type 0x10) — username + XOR/nibble-swap password
 //!   Server → token stream containing LOGINACK (0xAD) on success or ERROR (0xAA)
 
+use crate::net::TcpConnection;
 use async_trait::async_trait;
 use std::net::ToSocketAddrs;
 use std::time::Instant;
 use tracing::debug;
 use zeus_core::{AttackConfig, AttackResult, Credential, Protocol, Target, ZeusError};
-use crate::net::TcpConnection;
 
 pub struct MssqlProtocol;
 
 // ── TDS constants ─────────────────────────────────────────────────────────────
 
 const TDS_PRELOGIN: u8 = 0x12;
-const TDS_LOGIN7: u8   = 0x10;
+const TDS_LOGIN7: u8 = 0x10;
 const TDS_RESPONSE: u8 = 0x04;
 
 /// PRELOGIN option types
-const OPT_VERSION:    u8 = 0x00;
+const OPT_VERSION: u8 = 0x00;
 const OPT_ENCRYPTION: u8 = 0x01;
-const OPT_INSTOPT:    u8 = 0x02;
-const OPT_THREADID:   u8 = 0x03;
-const OPT_MARS:       u8 = 0x04;
+const OPT_INSTOPT: u8 = 0x02;
+const OPT_THREADID: u8 = 0x03;
+const OPT_MARS: u8 = 0x04;
 const OPT_TERMINATOR: u8 = 0xFF;
 
 /// ENCRYPT_NOT_SUP — skip TLS for brute-force purposes
@@ -34,8 +34,8 @@ const ENCRYPT_NOT_SUP: u8 = 0x02;
 
 /// TDS response token types
 const TOKEN_LOGINACK: u8 = 0xAD;
-const TOKEN_ERROR:    u8 = 0xAA;
-const TOKEN_DONE:     u8 = 0xFD;
+const TOKEN_ERROR: u8 = 0xAA;
+const TOKEN_DONE: u8 = 0xFD;
 
 // ── Password encoding ────────────────────────────────────────────────────────
 
@@ -65,8 +65,8 @@ fn tds_packet(pkt_type: u8, status: u8, body: &[u8]) -> Vec<u8> {
     pkt.push(status);
     pkt.extend_from_slice(&total_len.to_be_bytes());
     pkt.extend_from_slice(&0u16.to_be_bytes()); // spid
-    pkt.push(1);                                 // packet_id
-    pkt.push(0);                                 // window
+    pkt.push(1); // packet_id
+    pkt.push(0); // window
     pkt.extend_from_slice(body);
     pkt
 }
@@ -87,18 +87,18 @@ fn build_prelogin_body() -> Vec<u8> {
     const HDR: usize = 5 * 5 + 1; // 26
 
     // Value payloads
-    let version: [u8; 6]  = [0x0E, 0x00, 0x06, 0x03, 0x00, 0x00]; // SQL Server 14.0.603
+    let version: [u8; 6] = [0x0E, 0x00, 0x06, 0x03, 0x00, 0x00]; // SQL Server 14.0.603
     let encryption: [u8; 1] = [ENCRYPT_NOT_SUP];
-    let instopt: [u8; 1]  = [0x00];
+    let instopt: [u8; 1] = [0x00];
     let threadid: [u8; 4] = [0x00, 0x00, 0x00, 0x00];
-    let mars: [u8; 1]     = [0x00];
+    let mars: [u8; 1] = [0x00];
 
     // Calculate absolute offsets of each value block
-    let off_version    = HDR as u16;
+    let off_version = HDR as u16;
     let off_encryption = off_version + version.len() as u16;
-    let off_instopt    = off_encryption + encryption.len() as u16;
-    let off_threadid   = off_instopt + instopt.len() as u16;
-    let off_mars       = off_threadid + threadid.len() as u16;
+    let off_instopt = off_encryption + encryption.len() as u16;
+    let off_threadid = off_instopt + instopt.len() as u16;
+    let off_mars = off_threadid + threadid.len() as u16;
 
     let mut body = Vec::with_capacity(HDR + version.len() + 7);
 
@@ -108,11 +108,16 @@ fn build_prelogin_body() -> Vec<u8> {
         buf.extend_from_slice(&off.to_be_bytes());
         buf.extend_from_slice(&len.to_be_bytes());
     };
-    write_opt(&mut body, OPT_VERSION,    off_version,    version.len() as u16);
-    write_opt(&mut body, OPT_ENCRYPTION, off_encryption, encryption.len() as u16);
-    write_opt(&mut body, OPT_INSTOPT,    off_instopt,    instopt.len() as u16);
-    write_opt(&mut body, OPT_THREADID,   off_threadid,   threadid.len() as u16);
-    write_opt(&mut body, OPT_MARS,       off_mars,       mars.len() as u16);
+    write_opt(&mut body, OPT_VERSION, off_version, version.len() as u16);
+    write_opt(
+        &mut body,
+        OPT_ENCRYPTION,
+        off_encryption,
+        encryption.len() as u16,
+    );
+    write_opt(&mut body, OPT_INSTOPT, off_instopt, instopt.len() as u16);
+    write_opt(&mut body, OPT_THREADID, off_threadid, threadid.len() as u16);
+    write_opt(&mut body, OPT_MARS, off_mars, mars.len() as u16);
     body.push(OPT_TERMINATOR);
 
     // Value data
@@ -135,21 +140,33 @@ fn build_prelogin_body() -> Vec<u8> {
 #[allow(unused_assignments)]
 fn build_login7_body(username: &str, password: &str, server: &str) -> Vec<u8> {
     // TDS 7.4
-    const TDS_VERSION:    u32 = 0x0400_0074;
-    const PACKET_SIZE:    u32 = 0x0000_1000; // 4096
+    const TDS_VERSION: u32 = 0x0400_0074;
+    const PACKET_SIZE: u32 = 0x0000_1000; // 4096
     const CLIENT_PROG_VER: u32 = 0x0700_0000;
-    const OPTION_FLAGS1:  u8  = 0xE0;
-    const OPTION_FLAGS2:  u8  = 0x03;
+    const OPTION_FLAGS1: u8 = 0xE0;
+    const OPTION_FLAGS2: u8 = 0x03;
 
     // Variable-length fields we send (UTF-16LE for strings).
     // Fields we don't use are offset=0, length=0.
-    let hostname_utf16: Vec<u8>  = "zeus".encode_utf16().flat_map(|c| c.to_le_bytes()).collect();
-    let username_utf16: Vec<u8>  = username.encode_utf16().flat_map(|c| c.to_le_bytes()).collect();
-    let password_enc: Vec<u8>    = tds_encode_password(password);
-    let appname_utf16: Vec<u8>   = "zeus".encode_utf16().flat_map(|c| c.to_le_bytes()).collect();
-    let servername_utf16: Vec<u8> = server.encode_utf16().flat_map(|c| c.to_le_bytes()).collect();
-    let dbname_utf16: Vec<u8>    = vec![];
-    let language_utf16: Vec<u8>  = vec![];
+    let hostname_utf16: Vec<u8> = "zeus"
+        .encode_utf16()
+        .flat_map(|c| c.to_le_bytes())
+        .collect();
+    let username_utf16: Vec<u8> = username
+        .encode_utf16()
+        .flat_map(|c| c.to_le_bytes())
+        .collect();
+    let password_enc: Vec<u8> = tds_encode_password(password);
+    let appname_utf16: Vec<u8> = "zeus"
+        .encode_utf16()
+        .flat_map(|c| c.to_le_bytes())
+        .collect();
+    let servername_utf16: Vec<u8> = server
+        .encode_utf16()
+        .flat_map(|c| c.to_le_bytes())
+        .collect();
+    let dbname_utf16: Vec<u8> = vec![];
+    let language_utf16: Vec<u8> = vec![];
 
     // Fixed header (everything before the offset/length table) = 4 bytes (length field itself) +
     // the fixed fields. We will write them below and track the total.
@@ -167,7 +184,7 @@ fn build_login7_body(username: &str, password: &str, server: &str) -> Vec<u8> {
     //
     // Data offset starts at: 4 (length) + 36 (fixed) + 52 (table) = 92 bytes into the body.
     const FIXED_PRE: usize = 36;
-    const N_FIELDS: usize  = 13;
+    const N_FIELDS: usize = 13;
     const TABLE_LEN: usize = N_FIELDS * 4;
     const DATA_START: usize = 4 + FIXED_PRE + TABLE_LEN; // 92
 
@@ -197,8 +214,8 @@ fn build_login7_body(username: &str, password: &str, server: &str) -> Vec<u8> {
 
     // SSPI data (binary, not a UTF-16 string — length in bytes, not chars).
     // We send empty SSPI.
-    let sspi_off: u16  = 0;
-    let sspi_len: u16  = 0;
+    let sspi_off: u16 = 0;
+    let sspi_len: u16 = 0;
 
     let (hn_off, hn_len) = field!(&hostname_utf16);
     let (un_off, un_len) = field!(&username_utf16);
@@ -288,7 +305,9 @@ fn build_login7_body(username: &str, password: &str, server: &str) -> Vec<u8> {
 /// 8-byte TDS header.
 async fn read_tds_packet(conn: &mut TcpConnection) -> Result<Vec<u8>, ZeusError> {
     // Read 8-byte TDS header first
-    let header = conn.read_bytes(8).await
+    let header = conn
+        .read_bytes(8)
+        .await
         .map_err(|e| ZeusError::Protocol(format!("TDS: failed reading header: {e}")))?;
 
     if header.len() < 8 {
@@ -302,7 +321,8 @@ async fn read_tds_packet(conn: &mut TcpConnection) -> Result<Vec<u8>, ZeusError>
 
     let body_len = total_len - 8;
     let body = if body_len > 0 {
-        conn.read_bytes(body_len).await
+        conn.read_bytes(body_len)
+            .await
             .map_err(|e| ZeusError::Protocol(format!("TDS: failed reading body: {e}")))?
     } else {
         vec![]
@@ -349,8 +369,12 @@ fn scan_tokens(token_stream: &[u8]) -> bool {
 
 #[async_trait]
 impl Protocol for MssqlProtocol {
-    fn name(&self) -> &'static str { "mssql" }
-    fn default_port(&self) -> u16 { 1433 }
+    fn name(&self) -> &'static str {
+        "mssql"
+    }
+    fn default_port(&self) -> u16 {
+        1433
+    }
     fn description(&self) -> &'static str {
         "Microsoft SQL Server TDS 7.4 raw wire authentication (no external crates)"
     }
@@ -369,25 +393,32 @@ impl Protocol for MssqlProtocol {
             .ok_or_else(|| ZeusError::Protocol("DNS resolution failed".into()))?;
 
         let start = Instant::now();
-        let mut conn = TcpConnection::connect(addr, config.timeout).await
+        let mut conn = TcpConnection::connect(addr, config.timeout)
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
 
         // ── Step 1: send PRELOGIN ──────────────────────────────────────────
         let prelogin_body = build_prelogin_body();
-        let prelogin_pkt  = tds_packet(TDS_PRELOGIN, 0x01, &prelogin_body);
-        conn.write_all(&prelogin_pkt).await
+        let prelogin_pkt = tds_packet(TDS_PRELOGIN, 0x01, &prelogin_body);
+        conn.write_all(&prelogin_pkt)
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
         debug!("MSSQL: sent PRELOGIN ({} bytes)", prelogin_pkt.len());
 
         // ── Step 2: read PRELOGIN response ────────────────────────────────
         let pre_resp = read_tds_packet(&mut conn).await?;
-        debug!("MSSQL: PRELOGIN response {} bytes, type=0x{:02X}", pre_resp.len(), pre_resp.first().copied().unwrap_or(0));
+        debug!(
+            "MSSQL: PRELOGIN response {} bytes, type=0x{:02X}",
+            pre_resp.len(),
+            pre_resp.first().copied().unwrap_or(0)
+        );
 
         if pre_resp.is_empty() || pre_resp[0] != TDS_RESPONSE {
             let _ = conn.shutdown().await;
-            return Ok(AttackResult::Error(
-                format!("MSSQL: unexpected PRELOGIN response type 0x{:02X}", pre_resp.first().copied().unwrap_or(0)),
-            ));
+            return Ok(AttackResult::Error(format!(
+                "MSSQL: unexpected PRELOGIN response type 0x{:02X}",
+                pre_resp.first().copied().unwrap_or(0)
+            )));
         }
 
         // Check encryption negotiation — bail if server requires TLS (0x01)
@@ -398,8 +429,12 @@ impl Protocol for MssqlProtocol {
             while pos < body.len() {
                 let opt = body[pos];
                 pos += 1;
-                if opt == OPT_TERMINATOR { break; }
-                if pos + 4 > body.len() { break; }
+                if opt == OPT_TERMINATOR {
+                    break;
+                }
+                if pos + 4 > body.len() {
+                    break;
+                }
                 let off = u16::from_be_bytes([body[pos], body[pos + 1]]) as usize;
                 let len = u16::from_be_bytes([body[pos + 2], body[pos + 3]]) as usize;
                 pos += 4;
@@ -420,8 +455,9 @@ impl Protocol for MssqlProtocol {
         // ── Step 3: send LOGIN7 ───────────────────────────────────────────
         let server = target.host.as_str();
         let login7_body = build_login7_body(&cred.username, &cred.password, server);
-        let login7_pkt  = tds_packet(TDS_LOGIN7, 0x01, &login7_body);
-        conn.write_all(&login7_pkt).await
+        let login7_pkt = tds_packet(TDS_LOGIN7, 0x01, &login7_body);
+        conn.write_all(&login7_pkt)
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
         debug!("MSSQL: sent LOGIN7 ({} bytes)", login7_pkt.len());
 
@@ -470,7 +506,10 @@ mod tests {
 
     #[test]
     fn tds_password_encoding_non_empty() {
-        let plain: Vec<u8> = "password".encode_utf16().flat_map(|c| c.to_le_bytes()).collect();
+        let plain: Vec<u8> = "password"
+            .encode_utf16()
+            .flat_map(|c| c.to_le_bytes())
+            .collect();
         let enc = tds_encode_password("password");
         assert_eq!(plain.len(), enc.len(), "lengths must match");
         assert_ne!(plain, enc, "encoded must differ from raw UTF-16LE");
@@ -479,16 +518,20 @@ mod tests {
     #[test]
     fn prelogin_packet_has_correct_type() {
         let body = build_prelogin_body();
-        let pkt  = tds_packet(TDS_PRELOGIN, 0x01, &body);
+        let pkt = tds_packet(TDS_PRELOGIN, 0x01, &body);
         assert_eq!(pkt[0], 0x12, "first byte must be TDS PRELOGIN type (0x12)");
     }
 
     #[test]
     fn tds_packet_length_field_matches_actual_size() {
         let body = build_prelogin_body();
-        let pkt  = tds_packet(TDS_PRELOGIN, 0x01, &body);
+        let pkt = tds_packet(TDS_PRELOGIN, 0x01, &body);
         let reported_len = u16::from_be_bytes([pkt[2], pkt[3]]) as usize;
-        assert_eq!(reported_len, pkt.len(), "TDS length field must equal packet total length");
+        assert_eq!(
+            reported_len,
+            pkt.len(),
+            "TDS length field must equal packet total length"
+        );
     }
 
     #[test]
@@ -496,7 +539,11 @@ mod tests {
         let body = build_login7_body("sa", "password", "localhost");
         // First 4 bytes are total body length (LE)
         let reported = u32::from_le_bytes([body[0], body[1], body[2], body[3]]) as usize;
-        assert_eq!(reported, body.len(), "LOGIN7 length field must equal body.len()");
+        assert_eq!(
+            reported,
+            body.len(),
+            "LOGIN7 length field must equal body.len()"
+        );
     }
 
     #[test]

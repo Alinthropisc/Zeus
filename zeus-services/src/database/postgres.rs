@@ -6,12 +6,12 @@
 //!   Client → PasswordMessage("md5" + md5(md5(pass+user) + hex_salt))
 //!   Server → AuthenticationOk (R\x00\x00\x00\x08\x00\x00\x00\x00) or ErrorResponse
 
+use crate::net::TcpConnection;
 use async_trait::async_trait;
 use std::net::ToSocketAddrs;
 use std::time::Instant;
 use tracing::debug;
 use zeus_core::{AttackConfig, AttackResult, Credential, Protocol, Target, ZeusError};
-use crate::net::TcpConnection;
 use zeus_crypto::{md5, to_hex};
 
 pub struct PostgresProtocol;
@@ -74,9 +74,15 @@ fn build_password_message(pw: &str) -> Vec<u8> {
 
 #[async_trait]
 impl Protocol for PostgresProtocol {
-    fn name(&self) -> &'static str { "pgsql" }
-    fn default_port(&self) -> u16 { 5432 }
-    fn description(&self) -> &'static str { "PostgreSQL MD5 password authentication" }
+    fn name(&self) -> &'static str {
+        "pgsql"
+    }
+    fn default_port(&self) -> u16 {
+        5432
+    }
+    fn description(&self) -> &'static str {
+        "PostgreSQL MD5 password authentication"
+    }
 
     async fn authenticate(
         &self,
@@ -85,41 +91,57 @@ impl Protocol for PostgresProtocol {
         config: &AttackConfig,
     ) -> Result<AttackResult, ZeusError> {
         let addr_str = format!("{}:{}", target.host, target.port);
-        let addr = addr_str.to_socket_addrs().map_err(ZeusError::Network)?
-            .next().ok_or_else(|| ZeusError::Protocol("DNS resolution failed".into()))?;
+        let addr = addr_str
+            .to_socket_addrs()
+            .map_err(ZeusError::Network)?
+            .next()
+            .ok_or_else(|| ZeusError::Protocol("DNS resolution failed".into()))?;
 
         let start = Instant::now();
-        let mut conn = TcpConnection::connect(addr, config.timeout).await
+        let mut conn = TcpConnection::connect(addr, config.timeout)
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
 
         // ── Step 1: send StartupMessage ────────────────────────────────────
         let db = target.path.as_deref().unwrap_or("postgres");
         let startup = build_startup(&cred.username, db);
-        conn.write_all(&startup).await
+        conn.write_all(&startup)
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
 
         // ── Step 2: read authentication request ───────────────────────────
         // Format: Byte1(type) + Int32(len) + Int32(auth_type) + [data]
-        let resp = conn.read_until_crlf().await
+        let resp = conn
+            .read_until_crlf()
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
-        debug!("PgSQL auth request {} bytes, type={:?}", resp.len(), resp.first());
+        debug!(
+            "PgSQL auth request {} bytes, type={:?}",
+            resp.len(),
+            resp.first()
+        );
 
         if resp.len() < 9 {
             let _ = conn.shutdown().await;
-            return Ok(AttackResult::Error("PostgreSQL: auth response too short".into()));
+            return Ok(AttackResult::Error(
+                "PostgreSQL: auth response too short".into(),
+            ));
         }
 
         let msg_type = resp[0];
         if msg_type == b'E' {
             // ErrorResponse
             let _ = conn.shutdown().await;
-            return Ok(AttackResult::Error("PostgreSQL: server error on connect".into()));
+            return Ok(AttackResult::Error(
+                "PostgreSQL: server error on connect".into(),
+            ));
         }
         if msg_type != b'R' {
             let _ = conn.shutdown().await;
-            return Ok(AttackResult::Error(
-                format!("PostgreSQL: unexpected message type 0x{:02X}", msg_type),
-            ));
+            return Ok(AttackResult::Error(format!(
+                "PostgreSQL: unexpected message type 0x{:02X}",
+                msg_type
+            )));
         }
 
         let auth_type = u32::from_be_bytes([resp[5], resp[6], resp[7], resp[8]]);
@@ -137,7 +159,8 @@ impl Protocol for PostgresProtocol {
             3 => {
                 // AuthenticationCleartextPassword
                 let pw_msg = build_password_message(&cred.password);
-                conn.write_all(&pw_msg).await
+                conn.write_all(&pw_msg)
+                    .await
                     .map_err(|e| ZeusError::Protocol(e.to_string()))?;
             }
             5 => {
@@ -150,19 +173,23 @@ impl Protocol for PostgresProtocol {
                 let pw = pg_md5_password(&cred.username, &cred.password, &salt);
                 debug!("PgSQL MD5 password: {}", pw);
                 let pw_msg = build_password_message(&pw);
-                conn.write_all(&pw_msg).await
+                conn.write_all(&pw_msg)
+                    .await
                     .map_err(|e| ZeusError::Protocol(e.to_string()))?;
             }
             _ => {
                 let _ = conn.shutdown().await;
-                return Err(ZeusError::Protocol(
-                    format!("PostgreSQL: unsupported auth type {}", auth_type),
-                ));
+                return Err(ZeusError::Protocol(format!(
+                    "PostgreSQL: unsupported auth type {}",
+                    auth_type
+                )));
             }
         }
 
         // ── Step 3: read auth result ───────────────────────────────────────
-        let auth_result = conn.read_until_crlf().await
+        let auth_result = conn
+            .read_until_crlf()
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
         let _ = conn.shutdown().await;
 
@@ -175,7 +202,10 @@ impl Protocol for PostgresProtocol {
                 // Should be AuthenticationOk (auth_type == 0)
                 if auth_result.len() >= 9 {
                     let t = u32::from_be_bytes([
-                        auth_result[5], auth_result[6], auth_result[7], auth_result[8],
+                        auth_result[5],
+                        auth_result[6],
+                        auth_result[7],
+                        auth_result[8],
                     ]);
                     if t == 0 {
                         return Ok(AttackResult::Success {

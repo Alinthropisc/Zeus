@@ -15,11 +15,7 @@ pub struct CombinatorStrategy {
 }
 
 impl CombinatorStrategy {
-    pub fn new(
-        username: impl Into<String>,
-        list1: Vec<String>,
-        list2: Vec<String>,
-    ) -> Self {
+    pub fn new(username: impl Into<String>, list1: Vec<String>, list2: Vec<String>) -> Self {
         Self {
             username: username.into(),
             list1,
@@ -40,7 +36,9 @@ impl CombinatorStrategy {
 }
 
 impl AttackStrategy for CombinatorStrategy {
-    fn name(&self) -> &'static str { "combinator" }
+    fn name(&self) -> &'static str {
+        "combinator"
+    }
 
     fn credentials(&self) -> CredentialStream {
         let username = self.username.clone();
@@ -55,10 +53,7 @@ impl AttackStrategy for CombinatorStrategy {
                 let sep = sep.clone();
                 let username = username.clone();
                 list2.iter().map(move |w2| {
-                    Credential::new(
-                        username.clone(),
-                        format!("{}{}{}", w1, sep, w2),
-                    )
+                    Credential::new(username.clone(), format!("{}{}{}", w1, sep, w2))
                 })
             })
             .collect();
@@ -94,8 +89,8 @@ mod tests {
 
     #[test]
     fn combinator_separator() {
-        let s = CombinatorStrategy::new("user", words(&["pass"]), words(&["word"]))
-            .with_separator("_");
+        let s =
+            CombinatorStrategy::new("user", words(&["pass"]), words(&["word"])).with_separator("_");
         let creds = collect_sync(&s);
         assert_eq!(creds.len(), 1);
         assert_eq!(creds[0].password, "pass_word");

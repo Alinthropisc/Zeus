@@ -2,6 +2,9 @@ use crate::{AttackStrategy, CredentialStream};
 use tokio_stream::iter;
 use zeus_core::Credential;
 
+/// Type alias for a boxed, thread-safe rule closure.
+type RuleFn = Box<dyn Fn(&str) -> String + Send + Sync>;
+
 /// Hashcat-compatible transformation rules for password mutation.
 #[derive(Debug, Clone)]
 pub enum Rule {
@@ -52,18 +55,12 @@ impl Rule {
             Rule::AppendYear(y) => format!("{}{}", s, y),
             Rule::AppendNum(n) => format!("{}{}", s, n),
             Rule::L33tSpeak => s
-                .replace('e', "3")
-                .replace('E', "3")
-                .replace('a', "4")
-                .replace('A', "4")
-                .replace('o', "0")
-                .replace('O', "0")
-                .replace('i', "1")
-                .replace('I', "1")
-                .replace('s', "5")
-                .replace('S', "5")
-                .replace('t', "7")
-                .replace('T', "7"),
+                .replace(['e', 'E'], "3")
+                .replace(['a', 'A'], "4")
+                .replace(['o', 'O'], "0")
+                .replace(['i', 'I'], "1")
+                .replace(['s', 'S'], "5")
+                .replace(['t', 'T'], "7"),
             Rule::Duplicate => format!("{}{}", s, s),
             Rule::TruncateTo(n) => s.chars().take(*n).collect(),
             Rule::AppendStr(suffix) => format!("{}{}", s, suffix),
@@ -309,16 +306,12 @@ pub fn parse_rule(rule: &str) -> Box<dyn Fn(&str) -> String + Send + Sync> {
 pub struct RulesStrategy {
     username: String,
     wordlist: Vec<String>,
-    rules: Vec<Box<dyn Fn(&str) -> String + Send + Sync>>,
+    rules: Vec<RuleFn>,
 }
 
 impl RulesStrategy {
     /// Build from a wordlist and a slice of hashcat rule strings.
-    pub fn new(
-        username: impl Into<String>,
-        wordlist: Vec<String>,
-        rule_strings: &[&str],
-    ) -> Self {
+    pub fn new(username: impl Into<String>, wordlist: Vec<String>, rule_strings: &[&str]) -> Self {
         let rules = rule_strings.iter().map(|r| parse_rule(r)).collect();
         Self {
             username: username.into(),
@@ -331,7 +324,7 @@ impl RulesStrategy {
     pub fn with_rule_fns(
         username: impl Into<String>,
         wordlist: Vec<String>,
-        rules: Vec<Box<dyn Fn(&str) -> String + Send + Sync>>,
+        rules: Vec<RuleFn>,
     ) -> Self {
         Self {
             username: username.into(),
@@ -342,7 +335,9 @@ impl RulesStrategy {
 }
 
 impl AttackStrategy for RulesStrategy {
-    fn name(&self) -> &'static str { "rules" }
+    fn name(&self) -> &'static str {
+        "rules"
+    }
 
     fn credentials(&self) -> CredentialStream {
         let mut creds: Vec<Credential> = Vec::with_capacity(self.wordlist.len());
@@ -418,10 +413,7 @@ mod tests {
 
     #[test]
     fn ruleset_chains_rules() {
-        let rs = RuleSet::new(vec![
-            Rule::Capitalize,
-            Rule::AppendYear(2023),
-        ]);
+        let rs = RuleSet::new(vec![Rule::Capitalize, Rule::AppendYear(2023)]);
         assert_eq!(rs.apply("password"), "Password2023");
     }
 

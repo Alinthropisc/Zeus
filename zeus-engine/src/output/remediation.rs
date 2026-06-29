@@ -105,10 +105,7 @@ mod tests {
 
         for cat in &categories {
             let advice = db.suggest(cat);
-            assert!(
-                !advice.is_empty(),
-                "expected non-empty advice for {cat:?}"
-            );
+            assert!(!advice.is_empty(), "expected non-empty advice for {cat:?}");
         }
     }
 }

@@ -26,14 +26,14 @@ pub use markov::{MarkovChain, MarkovStrategy};
 pub use mask::MaskStrategy;
 pub use permutation::{LeetStrategy, PermutationStrategy};
 pub use prince::PrinceStrategy;
-pub use rules::{parse_rule, Rule, RuleSet, RulesStrategy};
+pub use rules::{Rule, RuleSet, RulesStrategy, parse_rule};
 pub use spray::{PasswordSprayStrategy, SprayConfig};
 pub use stuffing::{BreachEntry, CredentialStuffingPipeline, CredentialStuffingStrategy};
 pub use wordlist::Wordlist;
 
+use std::pin::Pin;
 use tokio_stream::Stream;
 use zeus_core::Credential;
-use std::pin::Pin;
 
 pub type CredentialStream = Pin<Box<dyn Stream<Item = Credential> + Send>>;
 

@@ -23,14 +23,25 @@ impl Target {
         }
     }
 
-    pub fn with_tls(mut self, tls: bool) -> Self { self.tls = tls; self }
-    pub fn with_path(mut self, path: impl Into<String>) -> Self { self.path = Some(path.into()); self }
+    pub fn with_tls(mut self, tls: bool) -> Self {
+        self.tls = tls;
+        self
+    }
+    pub fn with_path(mut self, path: impl Into<String>) -> Self {
+        self.path = Some(path.into());
+        self
+    }
     pub fn with_option(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
-        self.options.insert(key.into(), value.into()); self
+        self.options.insert(key.into(), value.into());
+        self
     }
 
     pub fn uri(&self) -> String {
-        let scheme = if self.tls { format!("{}s", self.protocol) } else { self.protocol.clone() };
+        let scheme = if self.tls {
+            format!("{}s", self.protocol)
+        } else {
+            self.protocol.clone()
+        };
         let path = self.path.as_deref().unwrap_or("");
         format!("{}://{}:{}{}", scheme, self.host, self.port, path)
     }
@@ -39,7 +50,8 @@ impl Target {
     pub fn from_url(url: &str) -> Result<Self, crate::ZeusError> {
         let url = url.trim();
         // Split scheme
-        let (scheme, rest) = url.split_once("://")
+        let (scheme, rest) = url
+            .split_once("://")
             .ok_or_else(|| crate::ZeusError::Config(format!("missing '://' in URL: {}", url)))?;
 
         // Detect TLS: scheme ends with 's' and base is known protocol
@@ -55,11 +67,13 @@ impl Target {
             None => (rest, None),
         };
 
-        let (host, port_str) = hostport.rsplit_once(':')
+        let (host, port_str) = hostport
+            .rsplit_once(':')
             .ok_or_else(|| crate::ZeusError::Config(format!("missing port in URL: {}", url)))?;
 
-        let port: u16 = port_str.parse()
-            .map_err(|_| crate::ZeusError::Config(format!("invalid port '{}' in URL: {}", port_str, url)))?;
+        let port: u16 = port_str.parse().map_err(|_| {
+            crate::ZeusError::Config(format!("invalid port '{}' in URL: {}", port_str, url))
+        })?;
 
         let mut target = Self::new(host, port, protocol);
         target.tls = tls;
@@ -71,8 +85,7 @@ impl Target {
     pub fn validate(&self) -> Result<(), crate::ZeusError> {
         use std::net::ToSocketAddrs;
         let addr = format!("{}:{}", self.host, self.port);
-        addr.to_socket_addrs()
-            .map_err(|e| crate::ZeusError::Network(e))?;
+        addr.to_socket_addrs().map_err(crate::ZeusError::Network)?;
         Ok(())
     }
 }
@@ -131,7 +144,9 @@ mod tests {
 
     #[test]
     fn uri_tls_with_path() {
-        let t = Target::new("example.com", 443, "http").with_tls(true).with_path("/admin/login");
+        let t = Target::new("example.com", 443, "http")
+            .with_tls(true)
+            .with_path("/admin/login");
         assert_eq!(t.uri(), "https://example.com:443/admin/login");
     }
 }

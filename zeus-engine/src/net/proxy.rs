@@ -2,7 +2,7 @@
 //!
 //! Used by `HttpClient::with_proxy` and raw TCP tunnelling helpers.
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 
 // ──────────────────────────────────────────────────────────────────────────────
 // ProxyType
@@ -80,7 +80,14 @@ impl ProxyConfig {
     pub fn url(&self) -> String {
         match (&self.username, &self.password) {
             (Some(u), Some(p)) => {
-                format!("{}://{}:{}@{}:{}", self.proxy_type.scheme(), u, p, self.host, self.port)
+                format!(
+                    "{}://{}:{}@{}:{}",
+                    self.proxy_type.scheme(),
+                    u,
+                    p,
+                    self.host,
+                    self.port
+                )
             }
             _ => format!("{}://{}:{}", self.proxy_type.scheme(), self.host, self.port),
         }
@@ -90,10 +97,23 @@ impl ProxyConfig {
     pub fn to_url(&self) -> String {
         match (&self.username, &self.password) {
             (Some(u), Some(p)) => {
-                format!("{}://{}:{}@{}:{}", self.proxy_type.scheme(), u, p, self.host, self.port)
+                format!(
+                    "{}://{}:{}@{}:{}",
+                    self.proxy_type.scheme(),
+                    u,
+                    p,
+                    self.host,
+                    self.port
+                )
             }
             (Some(u), None) => {
-                format!("{}://{}@{}:{}", self.proxy_type.scheme(), u, self.host, self.port)
+                format!(
+                    "{}://{}@{}:{}",
+                    self.proxy_type.scheme(),
+                    u,
+                    self.host,
+                    self.port
+                )
             }
             _ => format!("{}://{}:{}", self.proxy_type.scheme(), self.host, self.port),
         }
@@ -118,8 +138,7 @@ impl ProxyConfig {
     /// Build a [`reqwest::Proxy`] from this configuration.
     pub fn to_reqwest_proxy(&self) -> Result<reqwest::Proxy> {
         let url = self.url();
-        reqwest::Proxy::all(&url)
-            .map_err(|e| anyhow!("invalid proxy URL `{url}`: {e}"))
+        reqwest::Proxy::all(&url).map_err(|e| anyhow!("invalid proxy URL `{url}`: {e}"))
     }
 }
 
@@ -150,11 +169,17 @@ pub struct ProxyHop {
 
 impl ProxyHop {
     pub fn socks5(addr: SocketAddr) -> Self {
-        Self { addr, proto: ProxyProto::Socks5 }
+        Self {
+            addr,
+            proto: ProxyProto::Socks5,
+        }
     }
 
     pub fn http(addr: SocketAddr) -> Self {
-        Self { addr, proto: ProxyProto::Http }
+        Self {
+            addr,
+            proto: ProxyProto::Http,
+        }
     }
 }
 
@@ -172,7 +197,9 @@ pub struct ProxyChain {
 }
 
 impl ProxyChain {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     pub fn add_hop(mut self, hop: ProxyHop) -> Self {
         self.hops.push(hop);
@@ -272,14 +299,19 @@ impl ProxyChain {
                 loop {
                     stream.read_exact(&mut byte).await?;
                     buf.push(byte[0]);
-                    if buf.ends_with(b"\r\n\r\n") { break; }
+                    if buf.ends_with(b"\r\n\r\n") {
+                        break;
+                    }
                     if buf.len() > 4096 {
                         return Err(anyhow::anyhow!("HTTP CONNECT response too large"));
                     }
                 }
                 let resp_str = String::from_utf8_lossy(&buf);
                 if !resp_str.starts_with("HTTP/1.1 200") && !resp_str.starts_with("HTTP/1.0 200") {
-                    return Err(anyhow::anyhow!("HTTP CONNECT rejected: {}", resp_str.lines().next().unwrap_or("")));
+                    return Err(anyhow::anyhow!(
+                        "HTTP CONNECT rejected: {}",
+                        resp_str.lines().next().unwrap_or("")
+                    ));
                 }
             }
         }
@@ -305,8 +337,7 @@ mod tests {
 
     #[test]
     fn proxy_url_with_auth() {
-        let p = ProxyConfig::socks5("proxy.example.com", 1080)
-            .with_auth("alice", "s3cret");
+        let p = ProxyConfig::socks5("proxy.example.com", 1080).with_auth("alice", "s3cret");
         assert_eq!(p.url(), "socks5://alice:s3cret@proxy.example.com:1080");
     }
 

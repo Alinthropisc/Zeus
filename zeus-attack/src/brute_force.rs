@@ -60,7 +60,9 @@ impl BruteForceStrategy {
 }
 
 impl AttackStrategy for BruteForceStrategy {
-    fn name(&self) -> &'static str { "brute-force" }
+    fn name(&self) -> &'static str {
+        "brute-force"
+    }
 
     fn credentials(&self) -> CredentialStream {
         Box::pin(iter(self.generate_all()))

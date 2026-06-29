@@ -1,9 +1,9 @@
+use crate::net::TcpConnection;
 use async_trait::async_trait;
 use std::net::ToSocketAddrs;
 use std::time::Instant;
 use tracing::debug;
 use zeus_core::{AttackConfig, AttackResult, Credential, Protocol, Target, ZeusError};
-use crate::net::TcpConnection;
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Strategy pattern — SMTP enumeration strategies
@@ -113,7 +113,9 @@ pub struct RcptToStrategy {
 
 impl RcptToStrategy {
     pub fn new(from_domain: impl Into<String>) -> Self {
-        Self { from_domain: from_domain.into() }
+        Self {
+            from_domain: from_domain.into(),
+        }
     }
 }
 
@@ -172,8 +174,12 @@ pub struct SmtpEnumProtocol;
 
 #[async_trait]
 impl Protocol for SmtpEnumProtocol {
-    fn name(&self) -> &'static str { "smtp-enum" }
-    fn default_port(&self) -> u16 { 25 }
+    fn name(&self) -> &'static str {
+        "smtp-enum"
+    }
+    fn default_port(&self) -> u16 {
+        25
+    }
     fn description(&self) -> &'static str {
         "SMTP user enumeration via VRFY/EXPN. Options: method=vrfy|expn|rcpt, domain=example.com"
     }
@@ -185,34 +191,58 @@ impl Protocol for SmtpEnumProtocol {
         config: &AttackConfig,
     ) -> Result<AttackResult, ZeusError> {
         let addr_str = format!("{}:{}", target.host, target.port);
-        let addr = addr_str.to_socket_addrs().map_err(ZeusError::Network)?
-            .next().ok_or_else(|| ZeusError::Protocol("DNS failed".into()))?;
+        let addr = addr_str
+            .to_socket_addrs()
+            .map_err(ZeusError::Network)?
+            .next()
+            .ok_or_else(|| ZeusError::Protocol("DNS failed".into()))?;
 
-        let method = target.options.get("method").map(String::as_str).unwrap_or("vrfy");
-        let domain = target.options.get("domain").map(String::as_str).unwrap_or("localhost");
+        let method = target
+            .options
+            .get("method")
+            .map(String::as_str)
+            .unwrap_or("vrfy");
+        let domain = target
+            .options
+            .get("domain")
+            .map(String::as_str)
+            .unwrap_or("localhost");
 
         let start = Instant::now();
-        let mut conn = TcpConnection::connect(addr, config.timeout).await
+        let mut conn = TcpConnection::connect(addr, config.timeout)
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
 
-        conn.read_until_crlf().await.map_err(|e| ZeusError::Protocol(e.to_string()))?;
-        conn.write_all(b"EHLO zeus\r\n").await.map_err(|e| ZeusError::Protocol(e.to_string()))?;
-        conn.read_until_crlf().await.map_err(|e| ZeusError::Protocol(e.to_string()))?;
+        conn.read_until_crlf()
+            .await
+            .map_err(|e| ZeusError::Protocol(e.to_string()))?;
+        conn.write_all(b"EHLO zeus\r\n")
+            .await
+            .map_err(|e| ZeusError::Protocol(e.to_string()))?;
+        conn.read_until_crlf()
+            .await
+            .map_err(|e| ZeusError::Protocol(e.to_string()))?;
 
         let cmd = match method {
             "expn" => format!("EXPN {}\r\n", cred.username),
             "rcpt" => {
-                conn.write_all(format!("MAIL FROM:<zeus@{}>\r\n", domain).as_bytes()).await
+                conn.write_all(format!("MAIL FROM:<zeus@{}>\r\n", domain).as_bytes())
+                    .await
                     .map_err(|e| ZeusError::Protocol(e.to_string()))?;
-                conn.read_until_crlf().await.map_err(|e| ZeusError::Protocol(e.to_string()))?;
+                conn.read_until_crlf()
+                    .await
+                    .map_err(|e| ZeusError::Protocol(e.to_string()))?;
                 format!("RCPT TO:<{}@{}>\r\n", cred.username, domain)
             }
             _ => format!("VRFY {}\r\n", cred.username),
         };
 
-        conn.write_all(cmd.as_bytes()).await
+        conn.write_all(cmd.as_bytes())
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
-        let resp = conn.read_until_crlf().await
+        let resp = conn
+            .read_until_crlf()
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
         let resp_str = String::from_utf8_lossy(&resp);
         debug!("SMTP-ENUM resp: {:?}", resp_str);
@@ -223,7 +253,10 @@ impl Protocol for SmtpEnumProtocol {
         // 250 or 251 or 252 = user exists
         let code = resp_str.get(..3).unwrap_or("000");
         if matches!(code, "250" | "251" | "252") {
-            Ok(AttackResult::Success { credential: cred.clone(), elapsed: start.elapsed() })
+            Ok(AttackResult::Success {
+                credential: cred.clone(),
+                elapsed: start.elapsed(),
+            })
         } else {
             Ok(AttackResult::Failure)
         }
@@ -241,15 +274,30 @@ mod tests {
 
     #[test]
     fn interpret_response_exists() {
-        assert_eq!(interpret_smtp_response(b"250 alice@example.com"), EnumResult::Exists);
-        assert_eq!(interpret_smtp_response(b"251 forwarded"), EnumResult::Exists);
-        assert_eq!(interpret_smtp_response(b"252 cannot verify"), EnumResult::Exists);
+        assert_eq!(
+            interpret_smtp_response(b"250 alice@example.com"),
+            EnumResult::Exists
+        );
+        assert_eq!(
+            interpret_smtp_response(b"251 forwarded"),
+            EnumResult::Exists
+        );
+        assert_eq!(
+            interpret_smtp_response(b"252 cannot verify"),
+            EnumResult::Exists
+        );
     }
 
     #[test]
     fn interpret_response_not_found() {
-        assert_eq!(interpret_smtp_response(b"550 no such user"), EnumResult::NotFound);
-        assert_eq!(interpret_smtp_response(b"553 mailbox name not allowed"), EnumResult::NotFound);
+        assert_eq!(
+            interpret_smtp_response(b"550 no such user"),
+            EnumResult::NotFound
+        );
+        assert_eq!(
+            interpret_smtp_response(b"553 mailbox name not allowed"),
+            EnumResult::NotFound
+        );
     }
 
     #[test]

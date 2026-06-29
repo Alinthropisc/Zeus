@@ -45,7 +45,10 @@ impl ConnectionPool {
             .map_err(|e| anyhow::anyhow!("semaphore closed: {e}"))?;
 
         let inner = TcpConnection::connect(self.addr, self.timeout).await?;
-        Ok(PooledConnection { inner, _permit: permit })
+        Ok(PooledConnection {
+            inner,
+            _permit: permit,
+        })
     }
 
     /// Number of currently available slots.

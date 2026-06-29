@@ -43,9 +43,15 @@ async fn read_line_timeout(
 
 #[async_trait]
 impl Protocol for RloginProtocol {
-    fn name(&self) -> &'static str { "rlogin" }
-    fn default_port(&self) -> u16 { 513 }
-    fn description(&self) -> &'static str { "BSD rlogin password authentication (RFC 1258)" }
+    fn name(&self) -> &'static str {
+        "rlogin"
+    }
+    fn default_port(&self) -> u16 {
+        513
+    }
+    fn description(&self) -> &'static str {
+        "BSD rlogin password authentication (RFC 1258)"
+    }
 
     async fn authenticate(
         &self,
@@ -64,8 +70,7 @@ impl Protocol for RloginProtocol {
                 Err(_) => continue,
             };
             let _ = socket.set_reuseaddr(true);
-            let local: std::net::SocketAddr =
-                format!("0.0.0.0:{}", src_port).parse().unwrap();
+            let local: std::net::SocketAddr = format!("0.0.0.0:{}", src_port).parse().unwrap();
             if socket.bind(local).is_err() {
                 continue;
             }

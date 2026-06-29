@@ -17,17 +17,39 @@ pub struct CvssV3Builder {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub enum AttackVector { Network, Adjacent, Local, Physical }
+pub enum AttackVector {
+    Network,
+    Adjacent,
+    Local,
+    Physical,
+}
 #[derive(Debug, Clone, Copy)]
-pub enum AttackComplexity { Low, High }
+pub enum AttackComplexity {
+    Low,
+    High,
+}
 #[derive(Debug, Clone, Copy)]
-pub enum PrivilegesRequired { None, Low, High }
+pub enum PrivilegesRequired {
+    None,
+    Low,
+    High,
+}
 #[derive(Debug, Clone, Copy)]
-pub enum UserInteraction { None, Required }
+pub enum UserInteraction {
+    None,
+    Required,
+}
 #[derive(Debug, Clone, Copy)]
-pub enum Scope { Unchanged, Changed }
+pub enum Scope {
+    Unchanged,
+    Changed,
+}
 #[derive(Debug, Clone, Copy)]
-pub enum Impact { None, Low, High }
+pub enum Impact {
+    None,
+    Low,
+    High,
+}
 
 impl CvssV3Builder {
     /// Construct from at least 8 bytes; returns `None` if `data.len() < 8`.
@@ -41,17 +63,41 @@ impl CvssV3Builder {
             2 => AttackVector::Local,
             _ => AttackVector::Physical,
         };
-        let ac = if data[1] % 2 == 0 { AttackComplexity::Low } else { AttackComplexity::High };
+        let ac = if data[1] % 2 == 0 {
+            AttackComplexity::Low
+        } else {
+            AttackComplexity::High
+        };
         let pr = match data[2] % 3 {
             0 => PrivilegesRequired::None,
             1 => PrivilegesRequired::Low,
             _ => PrivilegesRequired::High,
         };
-        let ui = if data[3] % 2 == 0 { UserInteraction::None } else { UserInteraction::Required };
-        let sc = if data[4] % 2 == 0 { Scope::Unchanged } else { Scope::Changed };
-        let conf = match data[5] % 3 { 0 => Impact::None, 1 => Impact::Low, _ => Impact::High };
-        let integ = match data[6] % 3 { 0 => Impact::None, 1 => Impact::Low, _ => Impact::High };
-        let avail = match data[7] % 3 { 0 => Impact::None, 1 => Impact::Low, _ => Impact::High };
+        let ui = if data[3] % 2 == 0 {
+            UserInteraction::None
+        } else {
+            UserInteraction::Required
+        };
+        let sc = if data[4] % 2 == 0 {
+            Scope::Unchanged
+        } else {
+            Scope::Changed
+        };
+        let conf = match data[5] % 3 {
+            0 => Impact::None,
+            1 => Impact::Low,
+            _ => Impact::High,
+        };
+        let integ = match data[6] % 3 {
+            0 => Impact::None,
+            1 => Impact::Low,
+            _ => Impact::High,
+        };
+        let avail = match data[7] % 3 {
+            0 => Impact::None,
+            1 => Impact::Low,
+            _ => Impact::High,
+        };
 
         Some(Self {
             attack_vector: av,
@@ -99,14 +145,25 @@ impl CvssV3Builder {
 }
 
 fn impact_score(i: Impact) -> f32 {
-    match i { Impact::None => 0.0, Impact::Low => 0.22, Impact::High => 0.56 }
+    match i {
+        Impact::None => 0.0,
+        Impact::Low => 0.22,
+        Impact::High => 0.56,
+    }
 }
 fn av_score(v: AttackVector) -> f32 {
-    match v { AttackVector::Network => 0.85, AttackVector::Adjacent => 0.62,
-              AttackVector::Local => 0.55, AttackVector::Physical => 0.20 }
+    match v {
+        AttackVector::Network => 0.85,
+        AttackVector::Adjacent => 0.62,
+        AttackVector::Local => 0.55,
+        AttackVector::Physical => 0.20,
+    }
 }
 fn ac_score(c: AttackComplexity) -> f32 {
-    match c { AttackComplexity::Low => 0.77, AttackComplexity::High => 0.44 }
+    match c {
+        AttackComplexity::Low => 0.77,
+        AttackComplexity::High => 0.44,
+    }
 }
 fn pr_score(p: PrivilegesRequired, s: Scope) -> f32 {
     match (p, s) {
@@ -118,5 +175,8 @@ fn pr_score(p: PrivilegesRequired, s: Scope) -> f32 {
     }
 }
 fn ui_score(u: UserInteraction) -> f32 {
-    match u { UserInteraction::None => 0.85, UserInteraction::Required => 0.62 }
+    match u {
+        UserInteraction::None => 0.85,
+        UserInteraction::Required => 0.62,
+    }
 }

@@ -9,12 +9,11 @@ pub struct Wordlist {
 
 impl Wordlist {
     pub fn from_file(path: impl AsRef<Path>) -> Result<Self, ZeusError> {
-        let file = std::fs::File::open(path)
-            .map_err(|e| ZeusError::Wordlist(e.to_string()))?;
+        let file = std::fs::File::open(path).map_err(|e| ZeusError::Wordlist(e.to_string()))?;
         let reader = BufReader::new(file);
         let entries: Vec<String> = reader
             .lines()
-            .filter_map(|l| l.ok())
+            .map_while(Result::ok)
             .filter(|l| !l.trim().is_empty() && !l.starts_with('#'))
             .collect();
         Ok(Self { entries })
@@ -40,7 +39,7 @@ impl Wordlist {
         let entries: Vec<String> = stdin
             .lock()
             .lines()
-            .filter_map(|l| l.ok())
+            .map_while(Result::ok)
             .filter(|l| !l.trim().is_empty() && !l.starts_with('#'))
             .collect();
         Ok(Self { entries })
@@ -49,38 +48,149 @@ impl Wordlist {
     pub fn built_in(name: &str) -> Option<Self> {
         let entries: Vec<&str> = match name {
             "top10" => vec![
-                "123456", "password", "admin", "root", "letmein",
-                "qwerty", "abc123", "monkey", "1234567890", "password1",
+                "123456",
+                "password",
+                "admin",
+                "root",
+                "letmein",
+                "qwerty",
+                "abc123",
+                "monkey",
+                "1234567890",
+                "password1",
             ],
             "top25" => vec![
-                "123456", "password", "admin", "root", "letmein",
-                "qwerty", "abc123", "monkey", "1234567890", "password1",
-                "iloveyou", "111111", "dragon", "master", "sunshine",
-                "princess", "welcome", "shadow", "superman", "michael",
-                "football", "pass", "login", "654321", "mustang",
+                "123456",
+                "password",
+                "admin",
+                "root",
+                "letmein",
+                "qwerty",
+                "abc123",
+                "monkey",
+                "1234567890",
+                "password1",
+                "iloveyou",
+                "111111",
+                "dragon",
+                "master",
+                "sunshine",
+                "princess",
+                "welcome",
+                "shadow",
+                "superman",
+                "michael",
+                "football",
+                "pass",
+                "login",
+                "654321",
+                "mustang",
             ],
             "rockyou_top100" => vec![
-                "123456", "12345", "123456789", "password", "iloveyou",
-                "princess", "1234567", "rockyou", "12345678", "abc123",
-                "nicole", "daniel", "babygirl", "monkey", "jessica",
-                "lovely", "michael", "ashley", "654321", "qwerty",
-                "password1", "111111", "iloveu", "000000", "michelle",
-                "tigger", "sunshine", "chocolate", "password123", "donald",
-                "soccer", "batman", "access", "shadow", "master",
-                "michael1", "superman", "696969", "123123", "fuckyou",
-                "fuckyou1", "password2", "trustno1", "ranger", "buster",
-                "thomas", "robert", "hockey", "killer", "george",
-                "charlie", "andrew", "michelle1", "love", "joshua",
-                "lakers", "jessica1", "letmein", "whatever", "hello",
-                "steven", "viking", "cheese", "pepper", "zxcvbn",
-                "hannah", "victoria", "welcome", "enter", "christian",
-                "james", "mother", "tiger", "danielle", "carlos",
-                "linkinpark", "justin", "snoopy", "butter", "junior",
-                "1234", "abc", "password3", "test", "12345679",
-                "apple", "jennifer", "maverick", "secret", "pass",
-                "passw0rd", "abcdef", "hello123", "1q2w3e", "biteme",
-                "login", "ncc1701", "magic", "merlin", "princess1",
-                "driver", "12qwaszx", "beer", "hunter",
+                "123456",
+                "12345",
+                "123456789",
+                "password",
+                "iloveyou",
+                "princess",
+                "1234567",
+                "rockyou",
+                "12345678",
+                "abc123",
+                "nicole",
+                "daniel",
+                "babygirl",
+                "monkey",
+                "jessica",
+                "lovely",
+                "michael",
+                "ashley",
+                "654321",
+                "qwerty",
+                "password1",
+                "111111",
+                "iloveu",
+                "000000",
+                "michelle",
+                "tigger",
+                "sunshine",
+                "chocolate",
+                "password123",
+                "donald",
+                "soccer",
+                "batman",
+                "access",
+                "shadow",
+                "master",
+                "michael1",
+                "superman",
+                "696969",
+                "123123",
+                "fuckyou",
+                "fuckyou1",
+                "password2",
+                "trustno1",
+                "ranger",
+                "buster",
+                "thomas",
+                "robert",
+                "hockey",
+                "killer",
+                "george",
+                "charlie",
+                "andrew",
+                "michelle1",
+                "love",
+                "joshua",
+                "lakers",
+                "jessica1",
+                "letmein",
+                "whatever",
+                "hello",
+                "steven",
+                "viking",
+                "cheese",
+                "pepper",
+                "zxcvbn",
+                "hannah",
+                "victoria",
+                "welcome",
+                "enter",
+                "christian",
+                "james",
+                "mother",
+                "tiger",
+                "danielle",
+                "carlos",
+                "linkinpark",
+                "justin",
+                "snoopy",
+                "butter",
+                "junior",
+                "1234",
+                "abc",
+                "password3",
+                "test",
+                "12345679",
+                "apple",
+                "jennifer",
+                "maverick",
+                "secret",
+                "pass",
+                "passw0rd",
+                "abcdef",
+                "hello123",
+                "1q2w3e",
+                "biteme",
+                "login",
+                "ncc1701",
+                "magic",
+                "merlin",
+                "princess1",
+                "driver",
+                "12qwaszx",
+                "beer",
+                "hunter",
             ],
             _ => return None,
         };
@@ -99,15 +209,23 @@ impl Wordlist {
 
     pub fn credentials(&self, username: &str) -> impl Iterator<Item = Credential> + '_ {
         let user = username.to_owned();
-        self.entries.iter().map(move |p| Credential::new(user.clone(), p.clone()))
+        self.entries
+            .iter()
+            .map(move |p| Credential::new(user.clone(), p.clone()))
     }
 
     pub fn credential_pairs(&self) -> impl Iterator<Item = Credential> + '_ {
-        self.entries.iter().filter_map(|s| Credential::from_colon_str(s))
+        self.entries
+            .iter()
+            .filter_map(|s| Credential::from_colon_str(s))
     }
 
-    pub fn len(&self) -> usize { self.entries.len() }
-    pub fn is_empty(&self) -> bool { self.entries.is_empty() }
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
 }
 
 impl IntoIterator for Wordlist {

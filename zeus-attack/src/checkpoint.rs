@@ -14,19 +14,29 @@ pub struct CheckpointStrategy {
 impl CheckpointStrategy {
     /// Create a checkpoint strategy that passes all credentials through.
     pub fn new(inner: Box<dyn AttackStrategy>) -> Self {
-        Self { inner, skip_first: 0 }
+        Self {
+            inner,
+            skip_first: 0,
+        }
     }
 
     /// Resume from a checkpoint — skip the first `attempts_done` credentials.
     pub fn resume_from(inner: Box<dyn AttackStrategy>, attempts_done: u64) -> Self {
-        Self { inner, skip_first: attempts_done }
+        Self {
+            inner,
+            skip_first: attempts_done,
+        }
     }
 
-    pub fn skip_count(&self) -> u64 { self.skip_first }
+    pub fn skip_count(&self) -> u64 {
+        self.skip_first
+    }
 }
 
 impl AttackStrategy for CheckpointStrategy {
-    fn name(&self) -> &'static str { "checkpoint" }
+    fn name(&self) -> &'static str {
+        "checkpoint"
+    }
 
     fn credentials(&self) -> CredentialStream {
         let skip = self.skip_first;
@@ -52,9 +62,15 @@ mod tests {
     struct FixedStrategy(Vec<Credential>);
 
     impl AttackStrategy for FixedStrategy {
-        fn name(&self) -> &'static str { "fixed" }
-        fn credentials(&self) -> CredentialStream { Box::pin(iter(self.0.clone())) }
-        fn estimated_count(&self) -> Option<u64> { Some(self.0.len() as u64) }
+        fn name(&self) -> &'static str {
+            "fixed"
+        }
+        fn credentials(&self) -> CredentialStream {
+            Box::pin(iter(self.0.clone()))
+        }
+        fn estimated_count(&self) -> Option<u64> {
+            Some(self.0.len() as u64)
+        }
     }
 
     fn creds_n(n: usize) -> Vec<Credential> {

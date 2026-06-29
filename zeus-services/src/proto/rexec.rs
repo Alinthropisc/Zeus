@@ -1,17 +1,23 @@
+use crate::net::TcpConnection;
 use async_trait::async_trait;
 use std::net::ToSocketAddrs;
 use std::time::Instant;
 use tracing::debug;
 use zeus_core::{AttackConfig, AttackResult, Credential, Protocol, Target, ZeusError};
-use crate::net::TcpConnection;
 
 pub struct RexecProtocol;
 
 #[async_trait]
 impl Protocol for RexecProtocol {
-    fn name(&self) -> &'static str { "rexec" }
-    fn default_port(&self) -> u16 { 512 }
-    fn description(&self) -> &'static str { "REXEC remote execution authentication" }
+    fn name(&self) -> &'static str {
+        "rexec"
+    }
+    fn default_port(&self) -> u16 {
+        512
+    }
+    fn description(&self) -> &'static str {
+        "REXEC remote execution authentication"
+    }
 
     async fn authenticate(
         &self,
@@ -20,11 +26,15 @@ impl Protocol for RexecProtocol {
         config: &AttackConfig,
     ) -> Result<AttackResult, ZeusError> {
         let addr_str = format!("{}:{}", target.host, target.port);
-        let addr = addr_str.to_socket_addrs().map_err(ZeusError::Network)?
-            .next().ok_or_else(|| ZeusError::Protocol("DNS failed".into()))?;
+        let addr = addr_str
+            .to_socket_addrs()
+            .map_err(ZeusError::Network)?
+            .next()
+            .ok_or_else(|| ZeusError::Protocol("DNS failed".into()))?;
 
         let start = Instant::now();
-        let mut conn = TcpConnection::connect(addr, config.timeout).await
+        let mut conn = TcpConnection::connect(addr, config.timeout)
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
 
         // REXEC: send 0\0 (no stderr port), user\0, password\0, command\0
@@ -37,10 +47,13 @@ impl Protocol for RexecProtocol {
         packet.extend_from_slice(b"id");
         packet.push(0);
 
-        conn.write_all(&packet).await
+        conn.write_all(&packet)
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
 
-        let resp = conn.read_until_crlf().await
+        let resp = conn
+            .read_until_crlf()
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
         let resp_str = String::from_utf8_lossy(&resp);
         debug!("REXEC resp: {:?}", resp_str);
@@ -48,12 +61,18 @@ impl Protocol for RexecProtocol {
         let _ = conn.shutdown().await;
 
         if resp.is_empty() || resp[0] == 0 {
-            Ok(AttackResult::Success { credential: cred.clone(), elapsed: start.elapsed() })
+            Ok(AttackResult::Success {
+                credential: cred.clone(),
+                elapsed: start.elapsed(),
+            })
         } else if resp_str.contains("Login incorrect") || resp_str.contains("permission") {
             Ok(AttackResult::Failure)
         } else if resp_str.len() > 1 {
             // Got command output = authenticated
-            Ok(AttackResult::Success { credential: cred.clone(), elapsed: start.elapsed() })
+            Ok(AttackResult::Success {
+                credential: cred.clone(),
+                elapsed: start.elapsed(),
+            })
         } else {
             Ok(AttackResult::Failure)
         }

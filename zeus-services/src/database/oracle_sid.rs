@@ -13,37 +13,37 @@
 //! `cred.username` is treated as the SID to probe.
 //! `cred.password` is ignored during enumeration.
 
+use crate::net::TcpConnection;
 use async_trait::async_trait;
 use std::net::ToSocketAddrs;
 use std::time::Instant;
 use tracing::debug;
 use zeus_core::{AttackConfig, AttackResult, Credential, Protocol, Target, ZeusError};
-use crate::net::TcpConnection;
 
 pub struct OracleSidProtocol;
 
 // ── TNS constants ─────────────────────────────────────────────────────────────
 
-const TNS_TYPE_CONNECT:  u8 = 1;
-const TNS_TYPE_ACCEPT:   u8 = 2;
-const TNS_TYPE_REFUSE:   u8 = 4;
+const TNS_TYPE_CONNECT: u8 = 1;
+const TNS_TYPE_ACCEPT: u8 = 2;
+const TNS_TYPE_REFUSE: u8 = 4;
 const TNS_TYPE_REDIRECT: u8 = 5;
-const TNS_TYPE_DATA:     u8 = 6;
-const TNS_HDR_LEN:       usize = 8;
-const TNS_TYPE_OFFSET:   usize = 4;
+const TNS_TYPE_DATA: u8 = 6;
+const TNS_HDR_LEN: usize = 8;
+const TNS_TYPE_OFFSET: usize = 4;
 
-const TNS_CONNECT_VERSION:        u16 = 0x013A;
+const TNS_CONNECT_VERSION: u16 = 0x013A;
 const TNS_CONNECT_VERSION_COMPAT: u16 = 0x0134;
-const TNS_SERVICE_OPTIONS:        u16 = 0x0C41;
-const TNS_SDU:                    u16 = 0x0800;
-const TNS_TDU:                    u16 = 0x7FFF;
-const TNS_NT_PROTOCOL:            u16 = 0x0000;
-const TNS_LINE_TURNAROUND:        u16 = 0x0000;
-const TNS_VALUE_OF_ONE:           u16 = 0x0001;
-const TNS_MAX_RECV_CONNECT:       u32 = 512;
-const TNS_CONNECT_FLAGS:          u8  = 0x04;
-const TNS_CONNECT_FIXED_LEN:      usize = 28;
-const TNS_CONNECT_DATA_OFFSET:    u16 = (TNS_HDR_LEN + TNS_CONNECT_FIXED_LEN) as u16;
+const TNS_SERVICE_OPTIONS: u16 = 0x0C41;
+const TNS_SDU: u16 = 0x0800;
+const TNS_TDU: u16 = 0x7FFF;
+const TNS_NT_PROTOCOL: u16 = 0x0000;
+const TNS_LINE_TURNAROUND: u16 = 0x0000;
+const TNS_VALUE_OF_ONE: u16 = 0x0001;
+const TNS_MAX_RECV_CONNECT: u32 = 512;
+const TNS_CONNECT_FLAGS: u8 = 0x04;
+const TNS_CONNECT_FIXED_LEN: usize = 28;
+const TNS_CONNECT_DATA_OFFSET: u16 = (TNS_HDR_LEN + TNS_CONNECT_FIXED_LEN) as u16;
 
 // Oracle error codes that indicate the SID/service does not exist.
 // 12514 = TNS: listener does not know of service requested
@@ -95,7 +95,9 @@ pub fn sid_connect_descriptor(host: &str, port: u16, sid: &str) -> String {
 // ── Read helpers ──────────────────────────────────────────────────────────────
 
 async fn read_tns_packet(conn: &mut TcpConnection) -> Result<Vec<u8>, ZeusError> {
-    let header = conn.read_bytes(TNS_HDR_LEN).await
+    let header = conn
+        .read_bytes(TNS_HDR_LEN)
+        .await
         .map_err(|e| ZeusError::Protocol(format!("TNS: header read failed: {e}")))?;
     if header.len() < TNS_HDR_LEN {
         return Err(ZeusError::Protocol("TNS: header truncated".into()));
@@ -106,7 +108,8 @@ async fn read_tns_packet(conn: &mut TcpConnection) -> Result<Vec<u8>, ZeusError>
     }
     let body_len = total_len - TNS_HDR_LEN;
     let body = if body_len > 0 {
-        conn.read_bytes(body_len).await
+        conn.read_bytes(body_len)
+            .await
             .map_err(|e| ZeusError::Protocol(format!("TNS: body read failed: {e}")))?
     } else {
         vec![]
@@ -127,8 +130,12 @@ pub fn sid_not_found(data: &[u8]) -> bool {
 
 #[async_trait]
 impl Protocol for OracleSidProtocol {
-    fn name(&self) -> &'static str { "oracle-sid" }
-    fn default_port(&self) -> u16 { 1521 }
+    fn name(&self) -> &'static str {
+        "oracle-sid"
+    }
+    fn default_port(&self) -> u16 {
+        1521
+    }
     fn description(&self) -> &'static str {
         "Oracle SID enumeration via TNS"
     }
@@ -154,7 +161,8 @@ impl Protocol for OracleSidProtocol {
             .ok_or_else(|| ZeusError::Protocol("DNS resolution failed".into()))?;
 
         let start = Instant::now();
-        let mut conn = TcpConnection::connect(addr, config.timeout).await
+        let mut conn = TcpConnection::connect(addr, config.timeout)
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
 
         // ── Send TNS CONNECT with the SID ──────────────────────────────────
@@ -162,8 +170,9 @@ impl Protocol for OracleSidProtocol {
         debug!("OracleSid: probing SID='{}' descriptor={}", sid, desc);
 
         let connect_body = build_connect_body(desc.as_bytes());
-        let connect_pkt  = tns_packet(TNS_TYPE_CONNECT, &connect_body);
-        conn.write_all(&connect_pkt).await
+        let connect_pkt = tns_packet(TNS_TYPE_CONNECT, &connect_body);
+        conn.write_all(&connect_pkt)
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
 
         // ── Read listener response ─────────────────────────────────────────
@@ -208,11 +217,10 @@ impl Protocol for OracleSidProtocol {
                     })
                 }
             }
-            other => {
-                Ok(AttackResult::Error(
-                    format!("OracleSid: unexpected TNS response type {}", other),
-                ))
-            }
+            other => Ok(AttackResult::Error(format!(
+                "OracleSid: unexpected TNS response type {}",
+                other
+            ))),
         }
     }
 }
@@ -258,8 +266,8 @@ mod tests {
     #[test]
     fn tns_connect_packet_length_accurate() {
         let desc = sid_connect_descriptor("192.168.1.1", 1521, "TEST");
-        let body  = build_connect_body(desc.as_bytes());
-        let pkt   = tns_packet(TNS_TYPE_CONNECT, &body);
+        let body = build_connect_body(desc.as_bytes());
+        let pkt = tns_packet(TNS_TYPE_CONNECT, &body);
         let reported = u16::from_be_bytes([pkt[0], pkt[1]]) as usize;
         assert_eq!(reported, pkt.len());
     }

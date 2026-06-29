@@ -1,9 +1,9 @@
+use crate::net::TcpConnection;
 use async_trait::async_trait;
 use std::net::ToSocketAddrs;
 use std::time::Instant;
 use tracing::debug;
 use zeus_core::{AttackConfig, AttackResult, Credential, Protocol, Target, ZeusError};
-use crate::net::TcpConnection;
 
 pub struct LdapProtocol;
 
@@ -73,19 +73,31 @@ fn encode_ber_tlv(tag: u8, data: &[u8]) -> Vec<u8> {
 ///   [9] resultCode value  ← we want this
 fn parse_ldap_result_code(resp: &[u8]) -> Option<u8> {
     // Walk past SEQUENCE header
-    if resp.len() < 10 { return None; }
-    if resp[0] != 0x30 { return None; }
+    if resp.len() < 10 {
+        return None;
+    }
+    if resp[0] != 0x30 {
+        return None;
+    }
 
     // Skip outer SEQUENCE length (1 or 2 bytes)
-    let offset = if resp[1] & 0x80 != 0 { 2 + (resp[1] & 0x7f) as usize } else { 2 };
+    let offset = if resp[1] & 0x80 != 0 {
+        2 + (resp[1] & 0x7f) as usize
+    } else {
+        2
+    };
 
     // Skip messageID TLV: 0x02 + len + value
-    if resp.get(offset) != Some(&0x02) { return None; }
+    if resp.get(offset) != Some(&0x02) {
+        return None;
+    }
     let id_len = *resp.get(offset + 1)? as usize;
     let app_offset = offset + 2 + id_len;
 
     // Expect APPLICATION 1 (BindResponse) = 0x61
-    if resp.get(app_offset) != Some(&0x61) { return None; }
+    if resp.get(app_offset) != Some(&0x61) {
+        return None;
+    }
     let app_len_byte = *resp.get(app_offset + 1)?;
     let body_offset = if app_len_byte & 0x80 != 0 {
         app_offset + 2 + (app_len_byte & 0x7f) as usize
@@ -94,17 +106,27 @@ fn parse_ldap_result_code(resp: &[u8]) -> Option<u8> {
     };
 
     // First field inside BindResponse is resultCode ENUMERATED (0x0A)
-    if resp.get(body_offset) != Some(&0x0A) { return None; }
+    if resp.get(body_offset) != Some(&0x0A) {
+        return None;
+    }
     let enum_len = *resp.get(body_offset + 1)? as usize;
-    if enum_len < 1 { return None; }
+    if enum_len < 1 {
+        return None;
+    }
     resp.get(body_offset + 2).copied()
 }
 
 #[async_trait]
 impl Protocol for LdapProtocol {
-    fn name(&self) -> &'static str { "ldap" }
-    fn default_port(&self) -> u16 { 389 }
-    fn description(&self) -> &'static str { "LDAP Simple Bind authentication" }
+    fn name(&self) -> &'static str {
+        "ldap"
+    }
+    fn default_port(&self) -> u16 {
+        389
+    }
+    fn description(&self) -> &'static str {
+        "LDAP Simple Bind authentication"
+    }
 
     async fn authenticate(
         &self,
@@ -113,22 +135,31 @@ impl Protocol for LdapProtocol {
         config: &AttackConfig,
     ) -> Result<AttackResult, ZeusError> {
         let addr_str = format!("{}:{}", target.host, target.port);
-        let addr = addr_str.to_socket_addrs().map_err(ZeusError::Network)?
-            .next().ok_or_else(|| ZeusError::Protocol("DNS failed".into()))?;
+        let addr = addr_str
+            .to_socket_addrs()
+            .map_err(ZeusError::Network)?
+            .next()
+            .ok_or_else(|| ZeusError::Protocol("DNS failed".into()))?;
 
-        let dn = target.options.get("dn")
+        let dn = target
+            .options
+            .get("dn")
             .map(String::as_str)
             .unwrap_or(cred.username.as_str());
 
         let start = Instant::now();
-        let mut conn = TcpConnection::connect(addr, config.timeout).await
+        let mut conn = TcpConnection::connect(addr, config.timeout)
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
 
         let bind_req = ldap_bind_request(1, dn, &cred.password);
-        conn.write_all(&bind_req).await
+        conn.write_all(&bind_req)
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
 
-        let resp = conn.read_until_crlf().await
+        let resp = conn
+            .read_until_crlf()
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
         debug!("LDAP bind resp len={}", resp.len());
 
@@ -137,7 +168,10 @@ impl Protocol for LdapProtocol {
         match parse_ldap_result_code(&resp) {
             Some(0x00) => {
                 debug!("LDAP resultCode=0 (success)");
-                Ok(AttackResult::Success { credential: cred.clone(), elapsed: start.elapsed() })
+                Ok(AttackResult::Success {
+                    credential: cred.clone(),
+                    elapsed: start.elapsed(),
+                })
             }
             Some(code) => {
                 debug!("LDAP resultCode={} (failure)", code);
@@ -174,7 +208,10 @@ mod tests {
         // messageID INTEGER tag follows SEQUENCE header at offset 2
         assert_eq!(req[2], 0x02, "messageID must be INTEGER");
         // APPLICATION 0 BindRequest follows msgId TLV (offset 2+2+4=8)
-        assert_eq!(req[8], 0x60, "BindRequest must be APPLICATION 0 CONSTRUCTED");
+        assert_eq!(
+            req[8], 0x60,
+            "BindRequest must be APPLICATION 0 CONSTRUCTED"
+        );
     }
 
     #[test]
@@ -182,12 +219,12 @@ mod tests {
         // Hand-crafted minimal BindResponse with resultCode=0 (success)
         // SEQUENCE { INTEGER 1, [APPLICATION 1] { ENUM 0, OCTET "" , OCTET "" } }
         let response: &[u8] = &[
-            0x30, 0x0C,         // SEQUENCE, len=12
-            0x02, 0x01, 0x01,   // INTEGER msgId=1
-            0x61, 0x07,         // APPLICATION 1 (BindResponse), len=7
-            0x0A, 0x01, 0x00,   // ENUMERATED resultCode=0
-            0x04, 0x00,         // matchedDN="" (OCTET STRING, empty)
-            0x04, 0x00,         // diagnosticMessage="" (OCTET STRING, empty)
+            0x30, 0x0C, // SEQUENCE, len=12
+            0x02, 0x01, 0x01, // INTEGER msgId=1
+            0x61, 0x07, // APPLICATION 1 (BindResponse), len=7
+            0x0A, 0x01, 0x00, // ENUMERATED resultCode=0
+            0x04, 0x00, // matchedDN="" (OCTET STRING, empty)
+            0x04, 0x00, // diagnosticMessage="" (OCTET STRING, empty)
         ];
         assert_eq!(parse_ldap_result_code(response), Some(0x00));
     }
@@ -195,12 +232,9 @@ mod tests {
     #[test]
     fn parse_result_code_invalid_credentials() {
         let response: &[u8] = &[
-            0x30, 0x0C,
-            0x02, 0x01, 0x01,
-            0x61, 0x07,
-            0x0A, 0x01, 0x31,   // resultCode=49 (invalidCredentials)
-            0x04, 0x00,
-            0x04, 0x00,
+            0x30, 0x0C, 0x02, 0x01, 0x01, 0x61, 0x07, 0x0A, 0x01,
+            0x31, // resultCode=49 (invalidCredentials)
+            0x04, 0x00, 0x04, 0x00,
         ];
         assert_eq!(parse_ldap_result_code(response), Some(0x31));
     }

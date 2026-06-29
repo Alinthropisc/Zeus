@@ -1,11 +1,11 @@
 //! Symantec pcAnywhere authentication, port 5631.
 
+use crate::net::TcpConnection;
 use async_trait::async_trait;
 use std::net::ToSocketAddrs;
 use std::time::Instant;
 use tracing::debug;
 use zeus_core::{AttackConfig, AttackResult, Credential, Protocol, Target, ZeusError};
-use crate::net::TcpConnection;
 
 pub struct PcAnywhereProtocol;
 
@@ -40,9 +40,15 @@ fn build_pca_string(s: &str) -> Vec<u8> {
 
 #[async_trait]
 impl Protocol for PcAnywhereProtocol {
-    fn name(&self) -> &'static str { "pcanywhere" }
-    fn default_port(&self) -> u16 { 5631 }
-    fn description(&self) -> &'static str { "Symantec pcAnywhere authentication" }
+    fn name(&self) -> &'static str {
+        "pcanywhere"
+    }
+    fn default_port(&self) -> u16 {
+        5631
+    }
+    fn description(&self) -> &'static str {
+        "Symantec pcAnywhere authentication"
+    }
 
     async fn authenticate(
         &self,
@@ -102,7 +108,10 @@ impl Protocol for PcAnywhereProtocol {
 
         // Success: response starts with \x00\x00
         if resp[0] == 0x00 && resp[1] == 0x00 {
-            Ok(AttackResult::Success { credential: cred.clone(), elapsed: start.elapsed() })
+            Ok(AttackResult::Success {
+                credential: cred.clone(),
+                elapsed: start.elapsed(),
+            })
         } else {
             Ok(AttackResult::Failure)
         }

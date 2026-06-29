@@ -1,10 +1,10 @@
+use crate::net::TcpConnection;
 use async_trait::async_trait;
 use hmac::{Hmac, Mac};
 use md5::Md5;
-use zeus_core::{AttackConfig, AttackResult, Credential, Protocol, Target, ZeusError};
-use crate::net::TcpConnection;
 use std::net::ToSocketAddrs;
 use std::time::Instant;
+use zeus_core::{AttackConfig, AttackResult, Credential, Protocol, Target, ZeusError};
 
 pub struct SmbProtocol;
 
@@ -15,13 +15,31 @@ pub struct SmbProtocol;
 
 fn md4(data: &[u8]) -> [u8; 16] {
     // MD4 constants
-    const S11: u32 = 3; const S12: u32 = 7; const S13: u32 = 11; const S14: u32 = 19;
-    const S21: u32 = 3; const S22: u32 = 5; const S23: u32 = 9;  const S24: u32 = 13;
-    const S31: u32 = 3; const S32: u32 = 9; const S33: u32 = 11; const S34: u32 = 15;
+    const S11: u32 = 3;
+    const S12: u32 = 7;
+    const S13: u32 = 11;
+    const S14: u32 = 19;
+    const S21: u32 = 3;
+    const S22: u32 = 5;
+    const S23: u32 = 9;
+    const S24: u32 = 13;
+    const S31: u32 = 3;
+    const S32: u32 = 9;
+    const S33: u32 = 11;
+    const S34: u32 = 15;
 
-    #[inline(always)] fn f(x: u32, y: u32, z: u32) -> u32 { (x & y) | (!x & z) }
-    #[inline(always)] fn g(x: u32, y: u32, z: u32) -> u32 { (x & y) | (x & z) | (y & z) }
-    #[inline(always)] fn h(x: u32, y: u32, z: u32) -> u32 { x ^ y ^ z }
+    #[inline(always)]
+    fn f(x: u32, y: u32, z: u32) -> u32 {
+        (x & y) | (!x & z)
+    }
+    #[inline(always)]
+    fn g(x: u32, y: u32, z: u32) -> u32 {
+        (x & y) | (x & z) | (y & z)
+    }
+    #[inline(always)]
+    fn h(x: u32, y: u32, z: u32) -> u32 {
+        x ^ y ^ z
+    }
 
     #[inline(always)]
     fn ff(a: u32, b: u32, c: u32, d: u32, x: u32, s: u32) -> u32 {
@@ -29,11 +47,17 @@ fn md4(data: &[u8]) -> [u8; 16] {
     }
     #[inline(always)]
     fn gg(a: u32, b: u32, c: u32, d: u32, x: u32, s: u32) -> u32 {
-        a.wrapping_add(g(b, c, d)).wrapping_add(x).wrapping_add(0x5A827999).rotate_left(s)
+        a.wrapping_add(g(b, c, d))
+            .wrapping_add(x)
+            .wrapping_add(0x5A827999)
+            .rotate_left(s)
     }
     #[inline(always)]
     fn hh(a: u32, b: u32, c: u32, d: u32, x: u32, s: u32) -> u32 {
-        a.wrapping_add(h(b, c, d)).wrapping_add(x).wrapping_add(0x6ED9EBA1).rotate_left(s)
+        a.wrapping_add(h(b, c, d))
+            .wrapping_add(x)
+            .wrapping_add(0x6ED9EBA1)
+            .rotate_left(s)
     }
 
     // Pre-processing: pad message
@@ -55,40 +79,69 @@ fn md4(data: &[u8]) -> [u8; 16] {
     for chunk in msg.chunks(64) {
         let mut x = [0u32; 16];
         for i in 0..16 {
-            x[i] = u32::from_le_bytes([chunk[i*4], chunk[i*4+1], chunk[i*4+2], chunk[i*4+3]]);
+            x[i] = u32::from_le_bytes([
+                chunk[i * 4],
+                chunk[i * 4 + 1],
+                chunk[i * 4 + 2],
+                chunk[i * 4 + 3],
+            ]);
         }
 
         let (mut a, mut b, mut c, mut d) = (a0, b0, c0, d0);
 
         // Round 1
-        a = ff(a,b,c,d, x[ 0], S11); d = ff(d,a,b,c, x[ 1], S12);
-        c = ff(c,d,a,b, x[ 2], S13); b = ff(b,c,d,a, x[ 3], S14);
-        a = ff(a,b,c,d, x[ 4], S11); d = ff(d,a,b,c, x[ 5], S12);
-        c = ff(c,d,a,b, x[ 6], S13); b = ff(b,c,d,a, x[ 7], S14);
-        a = ff(a,b,c,d, x[ 8], S11); d = ff(d,a,b,c, x[ 9], S12);
-        c = ff(c,d,a,b, x[10], S13); b = ff(b,c,d,a, x[11], S14);
-        a = ff(a,b,c,d, x[12], S11); d = ff(d,a,b,c, x[13], S12);
-        c = ff(c,d,a,b, x[14], S13); b = ff(b,c,d,a, x[15], S14);
+        a = ff(a, b, c, d, x[0], S11);
+        d = ff(d, a, b, c, x[1], S12);
+        c = ff(c, d, a, b, x[2], S13);
+        b = ff(b, c, d, a, x[3], S14);
+        a = ff(a, b, c, d, x[4], S11);
+        d = ff(d, a, b, c, x[5], S12);
+        c = ff(c, d, a, b, x[6], S13);
+        b = ff(b, c, d, a, x[7], S14);
+        a = ff(a, b, c, d, x[8], S11);
+        d = ff(d, a, b, c, x[9], S12);
+        c = ff(c, d, a, b, x[10], S13);
+        b = ff(b, c, d, a, x[11], S14);
+        a = ff(a, b, c, d, x[12], S11);
+        d = ff(d, a, b, c, x[13], S12);
+        c = ff(c, d, a, b, x[14], S13);
+        b = ff(b, c, d, a, x[15], S14);
 
         // Round 2
-        a = gg(a,b,c,d, x[ 0], S21); d = gg(d,a,b,c, x[ 4], S22);
-        c = gg(c,d,a,b, x[ 8], S23); b = gg(b,c,d,a, x[12], S24);
-        a = gg(a,b,c,d, x[ 1], S21); d = gg(d,a,b,c, x[ 5], S22);
-        c = gg(c,d,a,b, x[ 9], S23); b = gg(b,c,d,a, x[13], S24);
-        a = gg(a,b,c,d, x[ 2], S21); d = gg(d,a,b,c, x[ 6], S22);
-        c = gg(c,d,a,b, x[10], S23); b = gg(b,c,d,a, x[14], S24);
-        a = gg(a,b,c,d, x[ 3], S21); d = gg(d,a,b,c, x[ 7], S22);
-        c = gg(c,d,a,b, x[11], S23); b = gg(b,c,d,a, x[15], S24);
+        a = gg(a, b, c, d, x[0], S21);
+        d = gg(d, a, b, c, x[4], S22);
+        c = gg(c, d, a, b, x[8], S23);
+        b = gg(b, c, d, a, x[12], S24);
+        a = gg(a, b, c, d, x[1], S21);
+        d = gg(d, a, b, c, x[5], S22);
+        c = gg(c, d, a, b, x[9], S23);
+        b = gg(b, c, d, a, x[13], S24);
+        a = gg(a, b, c, d, x[2], S21);
+        d = gg(d, a, b, c, x[6], S22);
+        c = gg(c, d, a, b, x[10], S23);
+        b = gg(b, c, d, a, x[14], S24);
+        a = gg(a, b, c, d, x[3], S21);
+        d = gg(d, a, b, c, x[7], S22);
+        c = gg(c, d, a, b, x[11], S23);
+        b = gg(b, c, d, a, x[15], S24);
 
         // Round 3
-        a = hh(a,b,c,d, x[ 0], S31); d = hh(d,a,b,c, x[ 8], S32);
-        c = hh(c,d,a,b, x[ 4], S33); b = hh(b,c,d,a, x[12], S34);
-        a = hh(a,b,c,d, x[ 2], S31); d = hh(d,a,b,c, x[10], S32);
-        c = hh(c,d,a,b, x[ 6], S33); b = hh(b,c,d,a, x[14], S34);
-        a = hh(a,b,c,d, x[ 1], S31); d = hh(d,a,b,c, x[ 9], S32);
-        c = hh(c,d,a,b, x[ 5], S33); b = hh(b,c,d,a, x[13], S34);
-        a = hh(a,b,c,d, x[ 3], S31); d = hh(d,a,b,c, x[11], S32);
-        c = hh(c,d,a,b, x[ 7], S33); b = hh(b,c,d,a, x[15], S34);
+        a = hh(a, b, c, d, x[0], S31);
+        d = hh(d, a, b, c, x[8], S32);
+        c = hh(c, d, a, b, x[4], S33);
+        b = hh(b, c, d, a, x[12], S34);
+        a = hh(a, b, c, d, x[2], S31);
+        d = hh(d, a, b, c, x[10], S32);
+        c = hh(c, d, a, b, x[6], S33);
+        b = hh(b, c, d, a, x[14], S34);
+        a = hh(a, b, c, d, x[1], S31);
+        d = hh(d, a, b, c, x[9], S32);
+        c = hh(c, d, a, b, x[5], S33);
+        b = hh(b, c, d, a, x[13], S34);
+        a = hh(a, b, c, d, x[3], S31);
+        d = hh(d, a, b, c, x[11], S32);
+        c = hh(c, d, a, b, x[7], S33);
+        b = hh(b, c, d, a, x[15], S34);
 
         a0 = a0.wrapping_add(a);
         b0 = b0.wrapping_add(b);
@@ -97,9 +150,9 @@ fn md4(data: &[u8]) -> [u8; 16] {
     }
 
     let mut out = [0u8; 16];
-    out[ 0.. 4].copy_from_slice(&a0.to_le_bytes());
-    out[ 4.. 8].copy_from_slice(&b0.to_le_bytes());
-    out[ 8..12].copy_from_slice(&c0.to_le_bytes());
+    out[0..4].copy_from_slice(&a0.to_le_bytes());
+    out[4..8].copy_from_slice(&b0.to_le_bytes());
+    out[8..12].copy_from_slice(&c0.to_le_bytes());
     out[12..16].copy_from_slice(&d0.to_le_bytes());
     out
 }
@@ -110,7 +163,8 @@ fn md4(data: &[u8]) -> [u8; 16] {
 
 /// NT hash: MD4(UTF-16LE(password))
 fn ntlm_nt_hash(password: &str) -> [u8; 16] {
-    let utf16le: Vec<u8> = password.encode_utf16()
+    let utf16le: Vec<u8> = password
+        .encode_utf16()
         .flat_map(|c| c.to_le_bytes())
         .collect();
     md4(&utf16le)
@@ -134,8 +188,8 @@ fn build_ntlmv2_blob(client_challenge: &[u8; 8]) -> Vec<u8> {
     let mut blob = Vec::new();
     blob.extend_from_slice(&[0x01, 0x01, 0x00, 0x00]); // blob signature
     blob.extend_from_slice(&[0x00, 0x00, 0x00, 0x00]); // reserved
-    blob.extend_from_slice(&[0x00u8; 8]);               // timestamp (zeroed — fine for brute force)
-    blob.extend_from_slice(client_challenge);           // 8-byte client challenge
+    blob.extend_from_slice(&[0x00u8; 8]); // timestamp (zeroed — fine for brute force)
+    blob.extend_from_slice(client_challenge); // 8-byte client challenge
     blob.extend_from_slice(&[0x00, 0x00, 0x00, 0x00]); // unknown
     // target_info would go here; omit for minimal implementation
     blob
@@ -167,15 +221,14 @@ fn compute_ntlmv2_response(
 /// Negotiates SMB 2.1 (dialect 0x0210).
 const SMB2_NEGOTIATE: &[u8] = &[
     // NetBIOS Session Service header (4 bytes): type=0x00, length=0x00000054
-    0x00, 0x00, 0x00, 0x54,
-    // SMB2 Header (64 bytes)
+    0x00, 0x00, 0x00, 0x54, // SMB2 Header (64 bytes)
     0xFE, 0x53, 0x4D, 0x42, // ProtocolId: "\xFESMB"
-    0x40, 0x00,              // StructureSize = 64
-    0x00, 0x00,              // CreditCharge
-    0x00, 0x00,              // ChannelSequence / Status
-    0x00, 0x00,              // Reserved
-    0x00, 0x00,              // Command: NEGOTIATE (0)
-    0x01, 0x00,              // CreditRequest
+    0x40, 0x00, // StructureSize = 64
+    0x00, 0x00, // CreditCharge
+    0x00, 0x00, // ChannelSequence / Status
+    0x00, 0x00, // Reserved
+    0x00, 0x00, // Command: NEGOTIATE (0)
+    0x01, 0x00, // CreditRequest
     0x00, 0x00, 0x00, 0x00, // Flags
     0x00, 0x00, 0x00, 0x00, // NextCommand
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // MessageId
@@ -183,19 +236,18 @@ const SMB2_NEGOTIATE: &[u8] = &[
     0xFF, 0xFF, 0xFF, 0xFF, // TreeId
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // SessionId
     // Signature (16 zero bytes)
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     // NEGOTIATE request body
-    0x24, 0x00,              // StructureSize = 36
-    0x01, 0x00,              // DialectCount = 1
-    0x00, 0x00,              // SecurityMode
-    0x00, 0x00,              // Reserved
+    0x24, 0x00, // StructureSize = 36
+    0x01, 0x00, // DialectCount = 1
+    0x00, 0x00, // SecurityMode
+    0x00, 0x00, // Reserved
     0x00, 0x00, 0x00, 0x00, // Capabilities
     // ClientGuid (16 zero bytes)
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, // ClientStartTime (8 bytes, but only 4 shown — body is 36 bytes total)
-    0x10, 0x02,              // Dialect: SMB 2.1 (0x0210)
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00,
+    0x00, // ClientStartTime (8 bytes, but only 4 shown — body is 36 bytes total)
+    0x10, 0x02, // Dialect: SMB 2.1 (0x0210)
 ];
 
 /// Minimal NTLMSSP_NEGOTIATE token wrapped in a SESSION_SETUP request.
@@ -204,16 +256,12 @@ fn build_session_setup_negotiate() -> Vec<u8> {
     // NTLMSSP_NEGOTIATE token (simplified)
     let ntlmssp_negotiate: &[u8] = &[
         // NTLMSSP signature
-        0x4E, 0x54, 0x4C, 0x4D, 0x53, 0x53, 0x50, 0x00,
-        // MessageType = NEGOTIATE (1)
+        0x4E, 0x54, 0x4C, 0x4D, 0x53, 0x53, 0x50, 0x00, // MessageType = NEGOTIATE (1)
         0x01, 0x00, 0x00, 0x00,
         // NegotiateFlags: NTLM | Extended Security | Unicode | OEM | Request Target | NTLM2 | Always sign
-        0x07, 0x82, 0x08, 0xa2,
-        // DomainNameFields (offset=0, len=0)
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        // WorkstationFields (offset=0, len=0)
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        // Version (8 bytes zeroed)
+        0x07, 0x82, 0x08, 0xa2, // DomainNameFields (offset=0, len=0)
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // WorkstationFields (offset=0, len=0)
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Version (8 bytes zeroed)
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     ];
 
@@ -313,11 +361,17 @@ fn der_sequence(parts: &[&[u8]]) -> Vec<u8> {
     der_tlv(0x30, &inner)
 }
 
-fn der_octet_string(data: &[u8]) -> Vec<u8> { der_tlv(0x04, data) }
+fn der_octet_string(data: &[u8]) -> Vec<u8> {
+    der_tlv(0x04, data)
+}
 
-fn der_context(n: u8, content: &[u8]) -> Vec<u8> { der_tlv(0xA0 | n, content) }
+fn der_context(n: u8, content: &[u8]) -> Vec<u8> {
+    der_tlv(0xA0 | n, content)
+}
 
-fn der_application(n: u8, content: &[u8]) -> Vec<u8> { der_tlv(0x60 | n, content) }
+fn der_application(n: u8, content: &[u8]) -> Vec<u8> {
+    der_tlv(0x60 | n, content)
+}
 
 /// Parse the 8-byte NTLMSSP server challenge from an SMB2 SESSION_SETUP response.
 /// The challenge is at a fixed offset inside the NTLMSSP_CHALLENGE message.
@@ -341,8 +395,12 @@ fn extract_ntlm_challenge(response: &[u8]) -> Option<[u8; 8]> {
 
 #[async_trait]
 impl Protocol for SmbProtocol {
-    fn name(&self) -> &'static str { "smb" }
-    fn default_port(&self) -> u16 { 445 }
+    fn name(&self) -> &'static str {
+        "smb"
+    }
+    fn default_port(&self) -> u16 {
+        445
+    }
     fn description(&self) -> &'static str {
         "SMB2 authentication with raw NTLMv2 challenge-response (MD4 NT hash + HMAC-MD5)"
     }
@@ -376,7 +434,9 @@ impl Protocol for SmbProtocol {
         let neg_resp = read_smb2_packet(&mut conn).await?;
         if neg_resp.len() < 68 {
             let _ = conn.shutdown().await;
-            return Ok(AttackResult::Error("SMB2 NEGOTIATE response too short".into()));
+            return Ok(AttackResult::Error(
+                "SMB2 NEGOTIATE response too short".into(),
+            ));
         }
         // Verify SMB2 magic in response (offset 4 after NetBIOS header)
         if &neg_resp[4..8] != b"\xFESMB" {
@@ -386,9 +446,9 @@ impl Protocol for SmbProtocol {
 
         // Step 4: Send SMB2 SESSION_SETUP with NTLMSSP_NEGOTIATE token
         let session_setup_neg = build_session_setup_negotiate();
-        conn.write_all(&session_setup_neg)
-            .await
-            .map_err(|e| ZeusError::Protocol(format!("SESSION_SETUP negotiate send failed: {}", e)))?;
+        conn.write_all(&session_setup_neg).await.map_err(|e| {
+            ZeusError::Protocol(format!("SESSION_SETUP negotiate send failed: {}", e))
+        })?;
 
         // Step 5: Read challenge response (STATUS_MORE_PROCESSING_REQUIRED = 0xC0000016)
         let challenge_resp = read_smb2_packet(&mut conn).await?;
@@ -408,21 +468,24 @@ impl Protocol for SmbProtocol {
         let username = &cred.username;
         let password = &cred.password;
         // Domain: use empty string if not specified (works for local accounts)
-        let domain = target.options.get("domain").map(String::as_str).unwrap_or("");
+        let domain = target
+            .options
+            .get("domain")
+            .map(String::as_str)
+            .unwrap_or("");
 
         let nt_hash = ntlm_nt_hash(password);
         let ntlmv2_h = ntlmv2_hash(&nt_hash, username, domain);
         // Use a fixed client challenge (zeroed) — acceptable for brute-force use
         let client_challenge = [0x61u8; 8]; // 'a' * 8
-        let ntlmv2_response = compute_ntlmv2_response(&ntlmv2_h, &server_challenge, &client_challenge);
+        let ntlmv2_response =
+            compute_ntlmv2_response(&ntlmv2_h, &server_challenge, &client_challenge);
 
         // Build SESSION_SETUP AUTH packet with NTLMSSP_AUTH token
         // Note: Full SMB2 SESSION_SETUP AUTH framing with NTLMSSP_AUTH is complex;
         // the NTLMv2 math above is correct. The packet below sends the auth token.
         // If the server rejects the framing, we return an appropriate result.
-        let auth_pkt = build_session_setup_auth(
-            username, domain, &ntlmv2_response, &nt_hash,
-        );
+        let auth_pkt = build_session_setup_auth(username, domain, &ntlmv2_response, &nt_hash);
         conn.write_all(&auth_pkt)
             .await
             .map_err(|e| ZeusError::Protocol(format!("SESSION_SETUP auth send failed: {}", e)))?;
@@ -433,9 +496,8 @@ impl Protocol for SmbProtocol {
 
         // SMB2 status is at bytes 8..12 of the SMB2 header (after 4-byte NetBIOS prefix)
         if auth_resp.len() >= 16 {
-            let status = u32::from_le_bytes([
-                auth_resp[8], auth_resp[9], auth_resp[10], auth_resp[11],
-            ]);
+            let status =
+                u32::from_le_bytes([auth_resp[8], auth_resp[9], auth_resp[10], auth_resp[11]]);
             if status == 0x00000000 {
                 // STATUS_SUCCESS
                 return Ok(AttackResult::Success {
@@ -461,9 +523,8 @@ async fn read_smb2_packet(conn: &mut TcpConnection) -> Result<Vec<u8>, ZeusError
         .await
         .map_err(|e| ZeusError::Protocol(format!("Failed to read NetBIOS header: {}", e)))?;
     // Bytes 1–3 are the 3-byte big-endian payload length (byte 0 is message type)
-    let payload_len = ((header[1] as usize) << 16)
-        | ((header[2] as usize) << 8)
-        | (header[3] as usize);
+    let payload_len =
+        ((header[1] as usize) << 16) | ((header[2] as usize) << 8) | (header[3] as usize);
     if payload_len > 65536 {
         return Err(ZeusError::Protocol(format!(
             "SMB2 packet too large: {} bytes",
@@ -502,9 +563,16 @@ fn build_session_setup_auth(
     //   followed by: domain (UTF-16LE), username (UTF-16LE), workstation,
     //                LM response (24 zeros), NT response, session key
 
-    let domain_utf16: Vec<u8> = domain.encode_utf16().flat_map(|c| c.to_le_bytes()).collect();
-    let user_utf16: Vec<u8> = username.encode_utf16().flat_map(|c| c.to_le_bytes()).collect();
-    let workstation_utf16: Vec<u8> = b"ZEUS".iter()
+    let domain_utf16: Vec<u8> = domain
+        .encode_utf16()
+        .flat_map(|c| c.to_le_bytes())
+        .collect();
+    let user_utf16: Vec<u8> = username
+        .encode_utf16()
+        .flat_map(|c| c.to_le_bytes())
+        .collect();
+    let workstation_utf16: Vec<u8> = b"ZEUS"
+        .iter()
         .flat_map(|&b| (b as u16).to_le_bytes())
         .collect();
     let lm_response = [0u8; 24]; // LMv2 response (zeroed for NTLMv2-only)
@@ -530,7 +598,7 @@ fn build_session_setup_auth(
     let session_key_len: u16 = 0;
 
     let mut auth_token = Vec::new();
-    auth_token.extend_from_slice(b"NTLMSSP\x00");   // signature
+    auth_token.extend_from_slice(b"NTLMSSP\x00"); // signature
     auth_token.extend_from_slice(&[0x03, 0x00, 0x00, 0x00]); // MessageType = AUTHENTICATE
     // LmChallengeResponseFields
     auth_token.extend_from_slice(&lm_len.to_le_bytes());

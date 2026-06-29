@@ -14,28 +14,28 @@
 //!
 //! The binary protocol header is always 24 bytes.
 
+use crate::net::TcpConnection;
 use async_trait::async_trait;
 use std::net::ToSocketAddrs;
 use std::time::Instant;
 use tracing::debug;
 use zeus_core::{AttackConfig, AttackResult, Credential, Protocol, Target, ZeusError};
-use crate::net::TcpConnection;
 
 pub struct MemcachedProtocol;
 
 // ── Binary protocol constants ─────────────────────────────────────────────────
 
-const BINARY_MAGIC_REQUEST:  u8 = 0x80;
+const BINARY_MAGIC_REQUEST: u8 = 0x80;
 const BINARY_MAGIC_RESPONSE: u8 = 0x81;
 
 const OPCODE_SASL_LIST_MECHS: u8 = 0x20;
-const OPCODE_SASL_AUTH:       u8 = 0x21;
+const OPCODE_SASL_AUTH: u8 = 0x21;
 
 /// Size of the binary protocol header in bytes (fixed at 24).
 pub const BINARY_HEADER_SIZE: usize = 24;
 
-const STATUS_SUCCESS:      u16 = 0x0000;
-const STATUS_AUTH_ERROR:   u16 = 0x0020;
+const STATUS_SUCCESS: u16 = 0x0000;
+const STATUS_AUTH_ERROR: u16 = 0x0020;
 #[allow(dead_code)]
 const STATUS_AUTH_CONTINUE: u16 = 0x0021;
 
@@ -105,16 +105,23 @@ pub fn build_sasl_auth(username: &str, password: &str) -> Vec<u8> {
 
 /// Read and validate a binary protocol response header.
 /// Returns the 24-byte header on success.
-async fn read_binary_header(conn: &mut TcpConnection) -> Result<[u8; BINARY_HEADER_SIZE], ZeusError> {
-    let raw = conn.read_bytes(BINARY_HEADER_SIZE).await
+async fn read_binary_header(
+    conn: &mut TcpConnection,
+) -> Result<[u8; BINARY_HEADER_SIZE], ZeusError> {
+    let raw = conn
+        .read_bytes(BINARY_HEADER_SIZE)
+        .await
         .map_err(|e| ZeusError::Protocol(format!("Memcached: header read: {e}")))?;
     if raw.len() < BINARY_HEADER_SIZE {
-        return Err(ZeusError::Protocol("Memcached: response header truncated".into()));
+        return Err(ZeusError::Protocol(
+            "Memcached: response header truncated".into(),
+        ));
     }
     if raw[0] != BINARY_MAGIC_RESPONSE {
-        return Err(ZeusError::Protocol(
-            format!("Memcached: unexpected response magic 0x{:02X}", raw[0]),
-        ));
+        return Err(ZeusError::Protocol(format!(
+            "Memcached: unexpected response magic 0x{:02X}",
+            raw[0]
+        )));
     }
     let mut hdr = [0u8; BINARY_HEADER_SIZE];
     hdr.copy_from_slice(&raw);
@@ -127,12 +134,16 @@ fn response_status(hdr: &[u8; BINARY_HEADER_SIZE]) -> u16 {
 }
 
 /// Drain the body of a binary response (total_body_length at bytes 8–11).
-async fn drain_binary_body(conn: &mut TcpConnection, hdr: &[u8; BINARY_HEADER_SIZE]) -> Result<Vec<u8>, ZeusError> {
+async fn drain_binary_body(
+    conn: &mut TcpConnection,
+    hdr: &[u8; BINARY_HEADER_SIZE],
+) -> Result<Vec<u8>, ZeusError> {
     let body_len = u32::from_be_bytes([hdr[8], hdr[9], hdr[10], hdr[11]]) as usize;
     if body_len == 0 {
         return Ok(vec![]);
     }
-    conn.read_bytes(body_len).await
+    conn.read_bytes(body_len)
+        .await
         .map_err(|e| ZeusError::Protocol(format!("Memcached: body read: {e}")))
 }
 
@@ -140,8 +151,12 @@ async fn drain_binary_body(conn: &mut TcpConnection, hdr: &[u8; BINARY_HEADER_SI
 
 #[async_trait]
 impl Protocol for MemcachedProtocol {
-    fn name(&self) -> &'static str { "memcached" }
-    fn default_port(&self) -> u16 { 11211 }
+    fn name(&self) -> &'static str {
+        "memcached"
+    }
+    fn default_port(&self) -> u16 {
+        11211
+    }
     fn description(&self) -> &'static str {
         "Memcached SASL binary PLAIN authentication (with ASCII version probe)"
     }
@@ -160,15 +175,19 @@ impl Protocol for MemcachedProtocol {
             .ok_or_else(|| ZeusError::Protocol("DNS failed".into()))?;
 
         let start = Instant::now();
-        let mut conn = TcpConnection::connect(addr, config.timeout).await
+        let mut conn = TcpConnection::connect(addr, config.timeout)
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
 
         // ── Step 1: ASCII VERSION probe ───────────────────────────────────
         // This tells us if the server is in open (no-auth) mode.
-        conn.write_all(b"version\r\n").await
+        conn.write_all(b"version\r\n")
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
 
-        let resp = conn.read_until_crlf().await
+        let resp = conn
+            .read_until_crlf()
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
         let resp_str = String::from_utf8_lossy(&resp);
         debug!("Memcached version resp: {:?}", resp_str);
@@ -186,14 +205,20 @@ impl Protocol for MemcachedProtocol {
         // the server in an error state.
         let _ = conn.shutdown().await;
 
-        let mut conn2 = TcpConnection::connect(addr, config.timeout).await
+        let mut conn2 = TcpConnection::connect(addr, config.timeout)
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
 
         // ── Step 2: SASL AUTH with PLAIN mechanism ────────────────────────
         let auth_pkt = build_sasl_auth(&cred.username, &cred.password);
-        conn2.write_all(&auth_pkt).await
+        conn2
+            .write_all(&auth_pkt)
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
-        debug!("Memcached: sent SASL AUTH PLAIN for user '{}'", cred.username);
+        debug!(
+            "Memcached: sent SASL AUTH PLAIN for user '{}'",
+            cred.username
+        );
 
         let hdr = read_binary_header(&mut conn2).await?;
         let _body = drain_binary_body(&mut conn2, &hdr).await?;
@@ -208,9 +233,10 @@ impl Protocol for MemcachedProtocol {
                 elapsed: start.elapsed(),
             }),
             STATUS_AUTH_ERROR => Ok(AttackResult::Failure),
-            other => Ok(AttackResult::Error(
-                format!("Memcached: unexpected SASL status 0x{:04X}", other),
-            )),
+            other => Ok(AttackResult::Error(format!(
+                "Memcached: unexpected SASL status 0x{:04X}",
+                other
+            ))),
         }
     }
 }
@@ -300,9 +326,9 @@ mod tests {
         assert_eq!(total_body, 15);
         // Body starts at offset 24
         assert_eq!(&pkt[24..29], b"PLAIN");
-        assert_eq!(pkt[29], 0x00);         // authzid separator
+        assert_eq!(pkt[29], 0x00); // authzid separator
         assert_eq!(&pkt[30..34], b"user");
-        assert_eq!(pkt[34], 0x00);         // username/password separator
+        assert_eq!(pkt[34], 0x00); // username/password separator
         assert_eq!(&pkt[35..39], b"pass");
     }
 

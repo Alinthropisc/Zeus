@@ -1,9 +1,9 @@
+pub mod builder;
 pub mod database;
+pub mod factory;
 pub mod net;
 pub mod proto;
 pub mod registry;
-pub mod factory;
-pub mod builder;
 
 /// Resolve `host:port` to a [`std::net::SocketAddr`], returning a
 /// [`zeus_core::ZeusError`] on failure.

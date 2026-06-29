@@ -23,9 +23,15 @@ struct StubProtocol {
 
 #[async_trait]
 impl Protocol for StubProtocol {
-    fn name(&self) -> &'static str { self.name }
-    fn default_port(&self) -> u16 { self.port }
-    fn description(&self) -> &'static str { self.description }
+    fn name(&self) -> &'static str {
+        self.name
+    }
+    fn default_port(&self) -> u16 {
+        self.port
+    }
+    fn description(&self) -> &'static str {
+        self.description
+    }
     async fn authenticate(
         &self,
         _target: &Target,
@@ -46,16 +52,28 @@ struct StubHandler {
 
 #[async_trait]
 impl ProbeHandler for StubHandler {
-    fn protocol(&self) -> &'static str { self.protocol }
-    fn default_port(&self) -> u16 { self.port }
-    fn description(&self) -> &'static str { self.description }
+    fn protocol(&self) -> &'static str {
+        self.protocol
+    }
+    fn default_port(&self) -> u16 {
+        self.port
+    }
+    fn description(&self) -> &'static str {
+        self.description
+    }
     async fn probe(&self, _target: &Target, _cred: &Credential) -> ProbeOutcome {
-        ProbeOutcome::Failure { reason: "stub always fails".into() }
+        ProbeOutcome::Failure {
+            reason: "stub always fails".into(),
+        }
     }
 }
 
 fn stub_protocol(name: &'static str, port: u16) -> Arc<dyn Protocol> {
-    Arc::new(StubProtocol { name, port, description: "stub protocol" })
+    Arc::new(StubProtocol {
+        name,
+        port,
+        description: "stub protocol",
+    })
 }
 
 // ── mod protocol_registry ─────────────────────────────────────────────────────
@@ -111,8 +129,7 @@ mod protocol_registry {
         let mut expected = list.clone();
         expected.sort();
         assert_eq!(
-            list,
-            expected,
+            list, expected,
             "list() must return protocol names in sorted order"
         );
     }
@@ -123,8 +140,14 @@ mod protocol_registry {
         reg.register(stub_protocol("alpha", 10));
         reg.register(stub_protocol("beta", 20));
         let list = reg.list();
-        assert!(list.contains(&"alpha".to_string()), "'alpha' must appear in list()");
-        assert!(list.contains(&"beta".to_string()), "'beta' must appear in list()");
+        assert!(
+            list.contains(&"alpha".to_string()),
+            "'alpha' must appear in list()"
+        );
+        assert!(
+            list.contains(&"beta".to_string()),
+            "'beta' must appear in list()"
+        );
     }
 
     #[test]
@@ -137,8 +160,7 @@ mod protocol_registry {
         let mut sorted = names.clone();
         sorted.sort();
         assert_eq!(
-            names,
-            sorted,
+            names, sorted,
             "list_protocols() must return ProtocolInfo entries sorted by name"
         );
     }
@@ -152,11 +174,22 @@ mod protocol_registry {
             description: "test description",
         }));
         let infos = reg.list_protocols();
-        let info = infos.iter().find(|i| i.name == "testproto")
+        let info = infos
+            .iter()
+            .find(|i| i.name == "testproto")
             .expect("ProtocolInfo for 'testproto' must be present");
-        assert_eq!(info.name, "testproto", "ProtocolInfo.name must match registered name");
-        assert_eq!(info.default_port, 4242, "ProtocolInfo.default_port must match registered port");
-        assert!(!info.description.is_empty(), "ProtocolInfo.description must not be empty");
+        assert_eq!(
+            info.name, "testproto",
+            "ProtocolInfo.name must match registered name"
+        );
+        assert_eq!(
+            info.default_port, 4242,
+            "ProtocolInfo.default_port must match registered port"
+        );
+        assert!(
+            !info.description.is_empty(),
+            "ProtocolInfo.description must not be empty"
+        );
     }
 
     #[test]
@@ -200,7 +233,11 @@ mod factory_registry {
     use super::*;
 
     fn make_handler(name: &'static str, port: u16) -> Box<dyn ProbeHandler> {
-        Box::new(StubHandler { protocol: name, port, description: "stub" })
+        Box::new(StubHandler {
+            protocol: name,
+            port,
+            description: "stub",
+        })
     }
 
     #[test]
@@ -216,10 +253,19 @@ mod factory_registry {
     fn test_factory_registry_register_and_create_returns_handler() {
         let reg = FactoryRegistry::new();
         reg.register("stub", || make_handler("stub", 1234));
-        let handler = reg.create("stub")
+        let handler = reg
+            .create("stub")
             .expect("create must return Some after registering 'stub'");
-        assert_eq!(handler.protocol(), "stub", "created handler must report protocol 'stub'");
-        assert_eq!(handler.default_port(), 1234, "created handler must report port 1234");
+        assert_eq!(
+            handler.protocol(),
+            "stub",
+            "created handler must report protocol 'stub'"
+        );
+        assert_eq!(
+            handler.default_port(),
+            1234,
+            "created handler must report port 1234"
+        );
     }
 
     #[test]
@@ -239,8 +285,16 @@ mod factory_registry {
         let h1 = reg.create("p").expect("first create must succeed");
         let h2 = reg.create("p").expect("second create must succeed");
         // Both are independent objects with the same metadata.
-        assert_eq!(h1.default_port(), h2.default_port(), "both handlers must report the same port");
-        assert_eq!(h1.protocol(), h2.protocol(), "both handlers must report the same protocol name");
+        assert_eq!(
+            h1.default_port(),
+            h2.default_port(),
+            "both handlers must report the same port"
+        );
+        assert_eq!(
+            h1.protocol(),
+            h2.protocol(),
+            "both handlers must report the same protocol name"
+        );
     }
 
     #[test]
@@ -253,8 +307,7 @@ mod factory_registry {
         let mut sorted = list.clone();
         sorted.sort_unstable();
         assert_eq!(
-            list,
-            sorted,
+            list, sorted,
             "protocols() must return names in sorted order"
         );
     }
@@ -272,11 +325,13 @@ mod factory_registry {
     #[test]
     fn test_factory_registry_handler_description_non_empty() {
         let reg = FactoryRegistry::new();
-        reg.register("with-desc", || Box::new(StubHandler {
-            protocol: "with-desc",
-            port: 42,
-            description: "a real description",
-        }));
+        reg.register("with-desc", || {
+            Box::new(StubHandler {
+                protocol: "with-desc",
+                port: 42,
+                description: "a real description",
+            })
+        });
         let handler = reg.create("with-desc").expect("handler must be created");
         assert!(
             !handler.description().is_empty(),
@@ -292,7 +347,9 @@ mod probe_outcome {
 
     #[test]
     fn test_probe_outcome_success_variant_is_success() {
-        let outcome = ProbeOutcome::Success { message: "authenticated".into() };
+        let outcome = ProbeOutcome::Success {
+            message: "authenticated".into(),
+        };
         assert!(
             outcome.is_success(),
             "ProbeOutcome::Success must report is_success() = true"
@@ -301,7 +358,9 @@ mod probe_outcome {
 
     #[test]
     fn test_probe_outcome_failure_variant_is_not_success() {
-        let outcome = ProbeOutcome::Failure { reason: "wrong password".into() };
+        let outcome = ProbeOutcome::Failure {
+            reason: "wrong password".into(),
+        };
         assert!(
             !outcome.is_success(),
             "ProbeOutcome::Failure must report is_success() = false"
@@ -318,7 +377,9 @@ mod probe_outcome {
 
     #[test]
     fn test_probe_outcome_error_variant_is_not_success() {
-        let outcome = ProbeOutcome::Error { detail: "connection refused".into() };
+        let outcome = ProbeOutcome::Error {
+            detail: "connection refused".into(),
+        };
         assert!(
             !outcome.is_success(),
             "ProbeOutcome::Error must report is_success() = false"
@@ -327,16 +388,25 @@ mod probe_outcome {
 
     #[test]
     fn test_probe_outcome_equality_same_success() {
-        let a = ProbeOutcome::Success { message: "ok".into() };
-        let b = ProbeOutcome::Success { message: "ok".into() };
-        assert_eq!(a, b, "two Success outcomes with the same message must be equal");
+        let a = ProbeOutcome::Success {
+            message: "ok".into(),
+        };
+        let b = ProbeOutcome::Success {
+            message: "ok".into(),
+        };
+        assert_eq!(
+            a, b,
+            "two Success outcomes with the same message must be equal"
+        );
     }
 
     #[test]
     fn test_probe_outcome_equality_different_variants() {
         assert_ne!(
             ProbeOutcome::Timeout,
-            ProbeOutcome::Failure { reason: "bad cred".into() },
+            ProbeOutcome::Failure {
+                reason: "bad cred".into()
+            },
             "Timeout and Failure outcomes must not be equal"
         );
     }
@@ -350,7 +420,11 @@ mod probe_command {
     fn make_factory_registry() -> FactoryRegistry {
         let reg = FactoryRegistry::new();
         reg.register("stub", || {
-            Box::new(StubHandler { protocol: "stub", port: 9999, description: "stub" })
+            Box::new(StubHandler {
+                protocol: "stub",
+                port: 9999,
+                description: "stub",
+            })
         });
         reg
     }

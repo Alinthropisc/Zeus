@@ -21,13 +21,19 @@ impl HttpFormProtocol {
 }
 
 impl Default for HttpFormProtocol {
-    fn default() -> Self { Self::new().expect("HTTP client init") }
+    fn default() -> Self {
+        Self::new().expect("HTTP client init")
+    }
 }
 
 #[async_trait]
 impl Protocol for HttpFormProtocol {
-    fn name(&self) -> &'static str { "http-form" }
-    fn default_port(&self) -> u16 { 80 }
+    fn name(&self) -> &'static str {
+        "http-form"
+    }
+    fn default_port(&self) -> u16 {
+        80
+    }
     fn description(&self) -> &'static str {
         "HTTP/HTTPS form login (POST/GET). Options: user_field, pass_field, fail_str, ok_str, method"
     }
@@ -42,11 +48,23 @@ impl Protocol for HttpFormProtocol {
         let path = target.path.as_deref().unwrap_or("/");
         let url = format!("{}://{}:{}{}", scheme, target.host, target.port, path);
 
-        let user_field = target.options.get("user_field").map(String::as_str).unwrap_or("username");
-        let pass_field = target.options.get("pass_field").map(String::as_str).unwrap_or("password");
-        let fail_str   = target.options.get("fail_str").map(String::as_str);
-        let ok_str     = target.options.get("ok_str").map(String::as_str);
-        let method     = target.options.get("method").map(String::as_str).unwrap_or("POST");
+        let user_field = target
+            .options
+            .get("user_field")
+            .map(String::as_str)
+            .unwrap_or("username");
+        let pass_field = target
+            .options
+            .get("pass_field")
+            .map(String::as_str)
+            .unwrap_or("password");
+        let fail_str = target.options.get("fail_str").map(String::as_str);
+        let ok_str = target.options.get("ok_str").map(String::as_str);
+        let method = target
+            .options
+            .get("method")
+            .map(String::as_str)
+            .unwrap_or("POST");
 
         let mut form = HashMap::new();
         form.insert(user_field.to_owned(), cred.username.clone());
@@ -84,7 +102,10 @@ impl Protocol for HttpFormProtocol {
         // ok_str takes priority (explicit success indicator)
         if let Some(ok) = ok_str {
             if body.contains(ok) {
-                return Ok(AttackResult::Success { credential: cred.clone(), elapsed: start.elapsed() });
+                return Ok(AttackResult::Success {
+                    credential: cred.clone(),
+                    elapsed: start.elapsed(),
+                });
             }
         }
 
@@ -95,7 +116,10 @@ impl Protocol for HttpFormProtocol {
             }
             // If fail_str not found and no error status, assume success
             if status.is_success() || status.is_redirection() {
-                return Ok(AttackResult::Success { credential: cred.clone(), elapsed: start.elapsed() });
+                return Ok(AttackResult::Success {
+                    credential: cred.clone(),
+                    elapsed: start.elapsed(),
+                });
             }
         }
 
@@ -104,7 +128,10 @@ impl Protocol for HttpFormProtocol {
             return Ok(AttackResult::Failure);
         }
         if status.is_success() || status.is_redirection() {
-            return Ok(AttackResult::Success { credential: cred.clone(), elapsed: start.elapsed() });
+            return Ok(AttackResult::Success {
+                credential: cred.clone(),
+                elapsed: start.elapsed(),
+            });
         }
 
         Ok(AttackResult::Failure)

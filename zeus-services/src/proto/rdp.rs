@@ -5,8 +5,12 @@ pub struct RdpProtocol;
 
 #[async_trait]
 impl Protocol for RdpProtocol {
-    fn name(&self) -> &'static str { "rdp" }
-    fn default_port(&self) -> u16 { 3389 }
+    fn name(&self) -> &'static str {
+        "rdp"
+    }
+    fn default_port(&self) -> u16 {
+        3389
+    }
     fn description(&self) -> &'static str {
         "RDP (Remote Desktop Protocol) authentication stub"
     }

@@ -96,7 +96,10 @@ impl CredentialStore {
 
     /// All credentials found via a specific protocol.
     pub fn by_protocol(&self, protocol: &str) -> Vec<&FoundCredential> {
-        self.found.iter().filter(|c| c.protocol == protocol).collect()
+        self.found
+            .iter()
+            .filter(|c| c.protocol == protocol)
+            .collect()
     }
 
     /// Number of stored credentials.
@@ -147,7 +150,12 @@ impl CredentialStore {
     pub fn to_plaintext(&self) -> String {
         self.found
             .iter()
-            .map(|c| format!("{}:{}@{}", c.credential.username, c.credential.password, c.target))
+            .map(|c| {
+                format!(
+                    "{}:{}@{}",
+                    c.credential.username, c.credential.password, c.target
+                )
+            })
             .collect::<Vec<_>>()
             .join("\n")
     }
@@ -171,12 +179,7 @@ mod tests {
     use super::*;
 
     fn make_found(user: &str, pass: &str, target: &str, protocol: &str) -> FoundCredential {
-        FoundCredential::new(
-            Credential::new(user, pass),
-            target,
-            protocol,
-            100,
-        )
+        FoundCredential::new(Credential::new(user, pass), target, protocol, 100)
     }
 
     #[test]

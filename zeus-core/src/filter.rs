@@ -25,7 +25,9 @@ pub struct FilterChain {
 impl FilterChain {
     /// Create an empty chain (passes everything).
     pub fn new() -> Self {
-        Self { filters: Vec::new() }
+        Self {
+            filters: Vec::new(),
+        }
     }
 
     /// Builder method — append a filter to the chain.
@@ -115,7 +117,9 @@ pub struct BlacklistFilter {
 impl BlacklistFilter {
     /// Construct from an explicit list of disallowed passwords.
     pub fn new(passwords: Vec<String>) -> Self {
-        Self { passwords: passwords.into_iter().collect() }
+        Self {
+            passwords: passwords.into_iter().collect(),
+        }
     }
 
     /// Pre-loaded with a set of common trivial passwords that are almost never
@@ -161,7 +165,9 @@ impl PatternFilter {
     /// Create a `PatternFilter` from a hashcat-style mask string,
     /// e.g. `"?u?l?l?d?d?d?d"`.
     pub fn from_mask(mask: &str) -> Self {
-        Self { pattern: mask.to_string() }
+        Self {
+            pattern: mask.to_string(),
+        }
     }
 
     fn matches(&self, s: &str) -> bool {
@@ -264,8 +270,8 @@ mod tests {
             .with(MinLengthFilter { min: 4 })
             .with(MaxLengthFilter { max: 8 });
 
-        assert!(chain.should_attempt(&cred("u", "abcd")));      // 4 chars — ok
-        assert!(!chain.should_attempt(&cred("u", "ab")));        // too short
+        assert!(chain.should_attempt(&cred("u", "abcd"))); // 4 chars — ok
+        assert!(!chain.should_attempt(&cred("u", "ab"))); // too short
         assert!(!chain.should_attempt(&cred("u", "abcdefghi"))); // too long
     }
 
@@ -326,7 +332,7 @@ mod tests {
         let f = PatternFilter::from_mask("?d?d?d?d");
         assert!(f.should_attempt(&cred("u", "1234")));
         assert!(!f.should_attempt(&cred("u", "12a4")));
-        assert!(!f.should_attempt(&cred("u", "123")));   // too short
+        assert!(!f.should_attempt(&cred("u", "123"))); // too short
         assert!(!f.should_attempt(&cred("u", "12345"))); // too long
     }
 

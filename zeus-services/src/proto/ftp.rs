@@ -1,19 +1,25 @@
 //! FTP protocol — raw TCP banner + USER/PASS commands.
 
+use crate::net::TcpConnection;
 use async_trait::async_trait;
 use std::net::ToSocketAddrs;
 use std::time::Instant;
 use tracing::debug;
 use zeus_core::{AttackConfig, AttackResult, Credential, Protocol, Target, ZeusError};
-use crate::net::TcpConnection;
 
 pub struct FtpProtocol;
 
 #[async_trait]
 impl Protocol for FtpProtocol {
-    fn name(&self) -> &'static str { "ftp" }
-    fn default_port(&self) -> u16 { 21 }
-    fn description(&self) -> &'static str { "FTP authentication" }
+    fn name(&self) -> &'static str {
+        "ftp"
+    }
+    fn default_port(&self) -> u16 {
+        21
+    }
+    fn description(&self) -> &'static str {
+        "FTP authentication"
+    }
 
     async fn authenticate(
         &self,
@@ -29,29 +35,38 @@ impl Protocol for FtpProtocol {
             .ok_or_else(|| ZeusError::Protocol("DNS resolution failed".into()))?;
 
         let start = Instant::now();
-        let mut conn = TcpConnection::connect(addr, config.timeout).await
+        let mut conn = TcpConnection::connect(addr, config.timeout)
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
 
         // Read banner (220 ...)
-        let banner = conn.read_until_crlf().await
+        let banner = conn
+            .read_until_crlf()
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
         debug!("FTP banner: {:?}", String::from_utf8_lossy(&banner));
 
         // Send USER
         let user_cmd = format!("USER {}\r\n", cred.username);
-        conn.write_all(user_cmd.as_bytes()).await
+        conn.write_all(user_cmd.as_bytes())
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
 
-        let user_resp = conn.read_until_crlf().await
+        let user_resp = conn
+            .read_until_crlf()
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
         debug!("FTP USER resp: {:?}", String::from_utf8_lossy(&user_resp));
 
         // Send PASS
         let pass_cmd = format!("PASS {}\r\n", cred.password);
-        conn.write_all(pass_cmd.as_bytes()).await
+        conn.write_all(pass_cmd.as_bytes())
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
 
-        let pass_resp = conn.read_until_crlf().await
+        let pass_resp = conn
+            .read_until_crlf()
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
         let resp_str = String::from_utf8_lossy(&pass_resp);
         debug!("FTP PASS resp: {:?}", resp_str);

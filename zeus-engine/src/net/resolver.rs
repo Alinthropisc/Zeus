@@ -31,7 +31,10 @@ impl AddressResolver {
 
     /// Create with a custom [`DnsCache`].
     pub fn with_dns(dns: DnsCache) -> Self {
-        Self { dns, prefer_ipv4: true }
+        Self {
+            dns,
+            prefer_ipv4: true,
+        }
     }
 
     /// Prefer IPv6 addresses over IPv4 when both are available.
@@ -46,11 +49,7 @@ impl AddressResolver {
     /// - IPv4 literals: `"192.168.1.1"`
     /// - IPv6 literals: `"::1"` or `"[::1]"`
     /// - Hostnames: `"example.com"`
-    pub async fn resolve(
-        &self,
-        host: &str,
-        port: u16,
-    ) -> Result<SocketAddr, std::io::Error> {
+    pub async fn resolve(&self, host: &str, port: u16) -> Result<SocketAddr, std::io::Error> {
         // Strip brackets from IPv6 literals like "[::1]"
         let bare = host.trim_start_matches('[').trim_end_matches(']');
 
@@ -78,7 +77,10 @@ impl AddressResolver {
         }
 
         let addrs = self.dns.resolve(host).await?;
-        Ok(addrs.into_iter().map(|ip| SocketAddr::new(ip, port)).collect())
+        Ok(addrs
+            .into_iter()
+            .map(|ip| SocketAddr::new(ip, port))
+            .collect())
     }
 
     /// Return `true` if `s` is an IP address literal (IPv4 or IPv6, with or

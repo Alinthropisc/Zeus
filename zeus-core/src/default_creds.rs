@@ -111,82 +111,82 @@ impl InMemoryDefaultCredsRepo {
 
         let entries = vec![
             // SSH
-            e("ssh", None, "root",     "root",       vd, None),
-            e("ssh", None, "root",     "",            vd, None),
-            e("ssh", None, "admin",    "admin",       vd, None),
-            e("ssh", None, "admin",    "password",    vd, None),
-            e("ssh", None, "ubnt",     "ubnt",        vd, Some(9.8)),
-            e("ssh", None, "pi",       "raspberry",   vd, Some(9.8)),
+            e("ssh", None, "root", "root", vd, None),
+            e("ssh", None, "root", "", vd, None),
+            e("ssh", None, "admin", "admin", vd, None),
+            e("ssh", None, "admin", "password", vd, None),
+            e("ssh", None, "ubnt", "ubnt", vd, Some(9.8)),
+            e("ssh", None, "pi", "raspberry", vd, Some(9.8)),
             // FTP
-            e("ftp", None, "anonymous", "",           vd, None),
-            e("ftp", None, "anonymous", "anonymous",  vd, None),
-            e("ftp", None, "admin",    "admin",       vd, None),
-            e("ftp", None, "ftp",      "ftp",         vd, None),
+            e("ftp", None, "anonymous", "", vd, None),
+            e("ftp", None, "anonymous", "anonymous", vd, None),
+            e("ftp", None, "admin", "admin", vd, None),
+            e("ftp", None, "ftp", "ftp", vd, None),
             // HTTP / admin panels
-            e("http", None, "admin",   "admin",       vd, None),
-            e("http", None, "admin",   "password",    vd, None),
-            e("http", None, "admin",   "",            vd, None),
-            e("http", None, "admin",   "1234",        vd, None),
-            e("http", None, "admin",   "admin123",    cm, None),
-            e("http", None, "user",    "user",        vd, None),
-            e("http", None, "guest",   "guest",       vd, None),
+            e("http", None, "admin", "admin", vd, None),
+            e("http", None, "admin", "password", vd, None),
+            e("http", None, "admin", "", vd, None),
+            e("http", None, "admin", "1234", vd, None),
+            e("http", None, "admin", "admin123", cm, None),
+            e("http", None, "user", "user", vd, None),
+            e("http", None, "guest", "guest", vd, None),
             // MySQL
-            e("mysql", None, "root",   "",            vd, None),
-            e("mysql", None, "root",   "root",        vd, None),
-            e("mysql", None, "root",   "mysql",       vd, None),
+            e("mysql", None, "root", "", vd, None),
+            e("mysql", None, "root", "root", vd, None),
+            e("mysql", None, "root", "mysql", vd, None),
             // PostgreSQL
-            e("postgresql", None, "postgres", "postgres",   vd, None),
-            e("postgresql", None, "postgres", "",           vd, None),
-            e("postgresql", None, "admin",    "admin",      vd, None),
+            e("postgresql", None, "postgres", "postgres", vd, None),
+            e("postgresql", None, "postgres", "", vd, None),
+            e("postgresql", None, "admin", "admin", vd, None),
             // Redis
-            e("redis", None, "",       "",            vd, Some(9.8)),
-            e("redis", None, "default","",            vd, Some(9.8)),
+            e("redis", None, "", "", vd, Some(9.8)),
+            e("redis", None, "default", "", vd, Some(9.8)),
             // MongoDB
-            e("mongodb", None, "",     "",            vd, Some(9.8)),
-            e("mongodb", None, "admin","admin",       vd, None),
+            e("mongodb", None, "", "", vd, Some(9.8)),
+            e("mongodb", None, "admin", "admin", vd, None),
             // Telnet
-            e("telnet", None, "admin", "admin",       vd, None),
-            e("telnet", None, "root",  "root",        vd, None),
-            e("telnet", None, "",      "",            vd, None),
+            e("telnet", None, "admin", "admin", vd, None),
+            e("telnet", None, "root", "root", vd, None),
+            e("telnet", None, "", "", vd, None),
             // SNMP (community strings as passwords)
-            e("snmp", None, "public",  "public",      vd, None),
-            e("snmp", None, "private", "private",     vd, None),
-            e("snmp", None, "manager", "manager",     vd, None),
+            e("snmp", None, "public", "public", vd, None),
+            e("snmp", None, "private", "private", vd, None),
+            e("snmp", None, "manager", "manager", vd, None),
             // RDP
-            e("rdp", None, "administrator", "password",       vd, None),
-            e("rdp", None, "administrator", "Password123",    cm, None),
-            e("rdp", None, "admin",         "admin",          vd, None),
+            e("rdp", None, "administrator", "password", vd, None),
+            e("rdp", None, "administrator", "Password123", cm, None),
+            e("rdp", None, "admin", "admin", vd, None),
             // VNC
-            e("vnc", None, "",         "password",    vd, None),
-            e("vnc", None, "",         "1234",        vd, None),
-            e("vnc", None, "",         "",            vd, None),
+            e("vnc", None, "", "password", vd, None),
+            e("vnc", None, "", "1234", vd, None),
+            e("vnc", None, "", "", vd, None),
             // Apache Tomcat
-            e("tomcat", Some("9.*"), "tomcat", "tomcat",  vd, Some(7.5)),
-            e("tomcat", Some("8.*"), "admin",  "admin",   vd, Some(7.5)),
-            e("tomcat", None,        "admin",  "tomcat",  vd, None),
-            e("tomcat", None,        "manager","manager", vd, None),
+            e("tomcat", Some("9.*"), "tomcat", "tomcat", vd, Some(7.5)),
+            e("tomcat", Some("8.*"), "admin", "admin", vd, Some(7.5)),
+            e("tomcat", None, "admin", "tomcat", vd, None),
+            e("tomcat", None, "manager", "manager", vd, None),
             // Jenkins
-            e("jenkins", None, "admin",   "admin",    vd, None),
-            e("jenkins", None, "jenkins", "jenkins",  cm, None),
-            e("jenkins", None, "admin",   "password", cm, None),
+            e("jenkins", None, "admin", "admin", vd, None),
+            e("jenkins", None, "jenkins", "jenkins", cm, None),
+            e("jenkins", None, "admin", "password", cm, None),
             // Cisco IOS / IOS-XE
-            e("cisco", None, "cisco",  "cisco",       vd, None),
-            e("cisco", None, "admin",  "cisco",       vd, None),
-            e("cisco", None, "cisco",  "Cisco",       vd, None),
-            e("cisco", None, "enable", "enable",      vd, None),
+            e("cisco", None, "cisco", "cisco", vd, None),
+            e("cisco", None, "admin", "cisco", vd, None),
+            e("cisco", None, "cisco", "Cisco", vd, None),
+            e("cisco", None, "enable", "enable", vd, None),
             // MikroTik RouterOS
-            e("mikrotik", None, "admin", "",          vd, Some(9.8)),
-            e("mikrotik", None, "admin", "admin",     vd, None),
+            e("mikrotik", None, "admin", "", vd, Some(9.8)),
+            e("mikrotik", None, "admin", "admin", vd, None),
             // Netgear
-            e("netgear", None, "admin", "password",   vd, None),
-            e("netgear", None, "admin", "1234",       vd, None),
+            e("netgear", None, "admin", "password", vd, None),
+            e("netgear", None, "admin", "1234", vd, None),
             // D-Link
-            e("dlink", None, "admin",  "",            vd, Some(9.8)),
-            e("dlink", None, "admin",  "admin",       vd, None),
-            e("dlink", None, "Admin",  "Admin",       vd, None),
+            e("dlink", None, "admin", "", vd, Some(9.8)),
+            e("dlink", None, "admin", "admin", vd, None),
+            e("dlink", None, "Admin", "Admin", vd, None),
             // Generic admin panel fall-backs
-            e("panel", None, "admin",  "admin",       cm, None),
-            e("panel", None, "root",   "toor",        cm, None),
+            e("panel", None, "admin", "admin", cm, None),
+            e("panel", None, "root", "toor", cm, None),
         ];
 
         Self { entries }
@@ -236,10 +236,10 @@ pub struct DefaultCredsSpec {
 impl DefaultCredsSpec {
     /// Returns `true` if `entry` satisfies all constraints in this specification.
     pub fn matches(&self, entry: &DefaultCredEntry) -> bool {
-        if let Some(ref svc) = self.service {
-            if entry.service_version.service != svc.to_lowercase() {
-                return false;
-            }
+        if let Some(ref svc) = self.service
+            && entry.service_version.service != svc.to_lowercase()
+        {
+            return false;
         }
         if let Some(min) = self.min_cvss {
             match entry.cvss_score {
@@ -248,10 +248,10 @@ impl DefaultCredsSpec {
                 _ => {}
             }
         }
-        if let Some(ref sources) = self.source_filter {
-            if !sources.contains(&entry.source) {
-                return false;
-            }
+        if let Some(ref sources) = self.source_filter
+            && !sources.contains(&entry.source)
+        {
+            return false;
         }
         true
     }
@@ -279,7 +279,10 @@ mod tests {
         let r = repo();
         let hits = r.lookup("ssh", None);
         assert!(!hits.is_empty());
-        assert!(hits.iter().any(|e| e.username == "root" && e.password == "root"));
+        assert!(
+            hits.iter()
+                .any(|e| e.username == "root" && e.password == "root")
+        );
     }
 
     #[test]
@@ -292,7 +295,10 @@ mod tests {
     #[test]
     fn spec_filters_by_min_cvss() {
         let r = repo();
-        let spec = DefaultCredsSpec { min_cvss: Some(9.0), ..Default::default() };
+        let spec = DefaultCredsSpec {
+            min_cvss: Some(9.0),
+            ..Default::default()
+        };
         let matching: Vec<_> = r.all().iter().filter(|e| spec.matches(e)).collect();
         assert!(matching.iter().all(|e| e.cvss_score.unwrap_or(0.0) >= 9.0));
         assert!(!matching.is_empty());
@@ -306,7 +312,11 @@ mod tests {
             ..Default::default()
         };
         let matching: Vec<_> = r.all().iter().filter(|e| spec.matches(e)).collect();
-        assert!(matching.iter().all(|e| e.service_version.service == "tomcat"));
+        assert!(
+            matching
+                .iter()
+                .all(|e| e.service_version.service == "tomcat")
+        );
         assert!(!matching.is_empty());
     }
 
@@ -333,7 +343,10 @@ mod tests {
 
     #[test]
     fn version_pattern_none_matches_any() {
-        let sv = ServiceVersion { service: "ssh".into(), version_pattern: None };
+        let sv = ServiceVersion {
+            service: "ssh".into(),
+            version_pattern: None,
+        };
         assert!(sv.matches_version(None));
         assert!(sv.matches_version(Some("7.4")));
     }

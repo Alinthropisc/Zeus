@@ -68,13 +68,20 @@ impl TextWriter<std::fs::File> {
 #[async_trait]
 impl<W: Write + Send + Sync> OutputWriter for TextWriter<W> {
     async fn write_found(&mut self, cred: &Credential) -> Result<(), OutputError> {
-        writeln!(self.out, "{BOLD}{GREEN}[FOUND]{RESET} {}:{}", cred.username, cred.password)?;
+        writeln!(
+            self.out,
+            "{BOLD}{GREEN}[FOUND]{RESET} {}:{}",
+            cred.username, cred.password
+        )?;
         Ok(())
     }
 
     async fn write_event(&mut self, event: &ProgressEvent) -> Result<(), OutputError> {
         match event {
-            ProgressEvent::SessionStarted { target, estimated_total } => {
+            ProgressEvent::SessionStarted {
+                target,
+                estimated_total,
+            } => {
                 let est = estimated_total
                     .map(|n| format!(" (estimated: {n})"))
                     .unwrap_or_default();
@@ -84,7 +91,12 @@ impl<W: Write + Send + Sync> OutputWriter for TextWriter<W> {
                     target.host
                 )?;
             }
-            ProgressEvent::SessionFinished { found, total_attempts, elapsed, .. } => {
+            ProgressEvent::SessionFinished {
+                found,
+                total_attempts,
+                elapsed,
+                ..
+            } => {
                 writeln!(
                     self.out,
                     "{CYAN}[=]{RESET} Session finished: {} found, {} attempts, {:.1}s",
@@ -96,8 +108,14 @@ impl<W: Write + Send + Sync> OutputWriter for TextWriter<W> {
             ProgressEvent::Warning(msg) if self.verbose => {
                 writeln!(self.out, "[!] {msg}")?;
             }
-            ProgressEvent::Stats { attempts_per_sec, found, remaining } if self.verbose => {
-                let rem = remaining.map(|r| format!(", ~{r} remaining")).unwrap_or_default();
+            ProgressEvent::Stats {
+                attempts_per_sec,
+                found,
+                remaining,
+            } if self.verbose => {
+                let rem = remaining
+                    .map(|r| format!(", ~{r} remaining"))
+                    .unwrap_or_default();
                 writeln!(
                     self.out,
                     "[~] {:.1} req/s  found: {found}{rem}",
@@ -148,7 +166,10 @@ mod tests {
     async fn session_started_event() {
         let mut w = make_writer(true);
         let target = Target::new("192.168.1.1", 22, "ssh");
-        let event = ProgressEvent::SessionStarted { target, estimated_total: Some(500) };
+        let event = ProgressEvent::SessionStarted {
+            target,
+            estimated_total: Some(500),
+        };
         w.write_event(&event).await.unwrap();
         let s = output(w);
         assert!(s.contains("[>]"), "expected [>] in: {s}");
@@ -179,15 +200,22 @@ mod tests {
     #[tokio::test]
     async fn warning_suppressed_when_not_verbose() {
         let mut w = make_writer(false);
-        w.write_event(&ProgressEvent::Warning("oops".to_string())).await.unwrap();
+        w.write_event(&ProgressEvent::Warning("oops".to_string()))
+            .await
+            .unwrap();
         let s = output(w);
-        assert!(s.is_empty(), "warning should be suppressed in non-verbose mode");
+        assert!(
+            s.is_empty(),
+            "warning should be suppressed in non-verbose mode"
+        );
     }
 
     #[tokio::test]
     async fn warning_shown_when_verbose() {
         let mut w = make_writer(true);
-        w.write_event(&ProgressEvent::Warning("oops".to_string())).await.unwrap();
+        w.write_event(&ProgressEvent::Warning("oops".to_string()))
+            .await
+            .unwrap();
         let s = output(w);
         assert!(s.contains("oops"), "warning should appear in verbose mode");
     }

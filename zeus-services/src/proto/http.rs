@@ -27,14 +27,22 @@ impl HttpProtocol {
 }
 
 impl Default for HttpProtocol {
-    fn default() -> Self { Self::new().expect("HTTP client init failed") }
+    fn default() -> Self {
+        Self::new().expect("HTTP client init failed")
+    }
 }
 
 #[async_trait]
 impl Protocol for HttpProtocol {
-    fn name(&self) -> &'static str { "http" }
-    fn default_port(&self) -> u16 { 80 }
-    fn description(&self) -> &'static str { "HTTP/HTTPS form-based login" }
+    fn name(&self) -> &'static str {
+        "http"
+    }
+    fn default_port(&self) -> u16 {
+        80
+    }
+    fn description(&self) -> &'static str {
+        "HTTP/HTTPS form-based login"
+    }
 
     async fn authenticate(
         &self,
@@ -46,9 +54,21 @@ impl Protocol for HttpProtocol {
         let path = target.path.as_deref().unwrap_or("/");
         let url = format!("{}://{}:{}{}", scheme, target.host, target.port, path);
 
-        let user_field = target.options.get("user_field").map(String::as_str).unwrap_or("username");
-        let pass_field = target.options.get("pass_field").map(String::as_str).unwrap_or("password");
-        let fail_str = target.options.get("fail_str").map(String::as_str).unwrap_or("Invalid");
+        let user_field = target
+            .options
+            .get("user_field")
+            .map(String::as_str)
+            .unwrap_or("username");
+        let pass_field = target
+            .options
+            .get("pass_field")
+            .map(String::as_str)
+            .unwrap_or("password");
+        let fail_str = target
+            .options
+            .get("fail_str")
+            .map(String::as_str)
+            .unwrap_or("Invalid");
 
         let mut form = HashMap::new();
         form.insert(user_field, cred.username.as_str());

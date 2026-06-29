@@ -20,12 +20,12 @@
 //! reporting the limitation.  A full SCRAM-SHA-1 implementation is included
 //! for completeness.
 
+use crate::net::TcpConnection;
 use async_trait::async_trait;
 use std::net::ToSocketAddrs;
 use std::time::Instant;
 use tracing::debug;
 use zeus_core::{AttackConfig, AttackResult, Credential, Protocol, Target, ZeusError};
-use crate::net::TcpConnection;
 
 pub struct MongoDbProtocol;
 
@@ -40,10 +40,10 @@ const ADMIN_CMD: &[u8] = b"admin.$cmd\x00";
 #[allow(dead_code)]
 #[repr(u8)]
 enum BsonType {
-    Double   = 0x01,
-    Str      = 0x02,
+    Double = 0x01,
+    Str = 0x02,
     Document = 0x03,
-    Int32    = 0x10,
+    Int32 = 0x10,
 }
 
 /// Encode a BSON double field.
@@ -204,20 +204,25 @@ pub fn mongo_cr_key(username: &str, password: &str, nonce: &str) -> String {
 /// Returns the raw bytes of the response body (after the 16-byte header).
 async fn read_mongo_response(conn: &mut TcpConnection) -> Result<Vec<u8>, ZeusError> {
     // OP_REPLY header is 16 bytes: msgLen(4) + reqId(4) + respTo(4) + opCode(4)
-    let header = conn.read_bytes(16).await
+    let header = conn
+        .read_bytes(16)
+        .await
         .map_err(|e| ZeusError::Protocol(format!("MongoDB: header read: {e}")))?;
     if header.len() < 16 {
         return Err(ZeusError::Protocol("MongoDB: header truncated".into()));
     }
     let msg_len = u32::from_le_bytes([header[0], header[1], header[2], header[3]]) as usize;
     if msg_len < 16 {
-        return Err(ZeusError::Protocol("MongoDB: invalid message length".into()));
+        return Err(ZeusError::Protocol(
+            "MongoDB: invalid message length".into(),
+        ));
     }
     let body_len = msg_len - 16;
     if body_len == 0 {
         return Ok(vec![]);
     }
-    conn.read_bytes(body_len).await
+    conn.read_bytes(body_len)
+        .await
         .map_err(|e| ZeusError::Protocol(format!("MongoDB: body read: {e}")))
 }
 
@@ -227,7 +232,7 @@ fn response_ok(data: &[u8]) -> bool {
     // Double 1.0 = 0x3F_F0_00_00_00_00_00_00 (LE)
     // We do a naive scan for the "ok" key and check the subsequent value byte
     for i in 0..data.len().saturating_sub(4) {
-        if data[i] == b'o' && data[i+1] == b'k' && data[i+2] == 0x00 {
+        if data[i] == b'o' && data[i + 1] == b'k' && data[i + 2] == 0x00 {
             // value starts at i+3 for int32 (type 0x10) or preceded by type byte
             // The type byte is BEFORE the key in BSON, so check data[i-1]
             if i > 0 {
@@ -237,17 +242,21 @@ fn response_ok(data: &[u8]) -> bool {
                         // int32
                         if let Some(slice) = data.get(val_start..val_start + 4) {
                             let v = i32::from_le_bytes([slice[0], slice[1], slice[2], slice[3]]);
-                            if v == 1 { return true; }
+                            if v == 1 {
+                                return true;
+                            }
                         }
                     }
                     Some(&0x01) => {
                         // double
                         if let Some(slice) = data.get(val_start..val_start + 8) {
                             let v = f64::from_le_bytes([
-                                slice[0], slice[1], slice[2], slice[3],
-                                slice[4], slice[5], slice[6], slice[7],
+                                slice[0], slice[1], slice[2], slice[3], slice[4], slice[5],
+                                slice[6], slice[7],
                             ]);
-                            if (v - 1.0).abs() < f64::EPSILON { return true; }
+                            if (v - 1.0).abs() < f64::EPSILON {
+                                return true;
+                            }
                         }
                     }
                     _ => {}
@@ -268,13 +277,19 @@ fn extract_bson_string(data: &[u8], key: &str) -> Option<String> {
             && data[i+1+key_bytes.len()] == 0x00
         {
             let val_start = i + 1 + key_bytes.len() + 1;
-            if val_start + 4 > data.len() { break; }
+            if val_start + 4 > data.len() {
+                break;
+            }
             let str_len = u32::from_le_bytes([
-                data[val_start], data[val_start+1],
-                data[val_start+2], data[val_start+3],
+                data[val_start],
+                data[val_start + 1],
+                data[val_start + 2],
+                data[val_start + 3],
             ]) as usize;
             let str_start = val_start + 4;
-            if str_start + str_len > data.len() { break; }
+            if str_start + str_len > data.len() {
+                break;
+            }
             // str_len includes the null terminator
             let s = &data[str_start..str_start + str_len.saturating_sub(1)];
             return Some(String::from_utf8_lossy(s).into_owned());
@@ -287,8 +302,12 @@ fn extract_bson_string(data: &[u8], key: &str) -> Option<String> {
 
 #[async_trait]
 impl Protocol for MongoDbProtocol {
-    fn name(&self) -> &'static str { "mongodb" }
-    fn default_port(&self) -> u16 { 27017 }
+    fn name(&self) -> &'static str {
+        "mongodb"
+    }
+    fn default_port(&self) -> u16 {
+        27017
+    }
     fn description(&self) -> &'static str {
         "MongoDB MONGODB-CR / SCRAM-SHA-1 authentication via raw wire protocol"
     }
@@ -307,12 +326,14 @@ impl Protocol for MongoDbProtocol {
             .ok_or_else(|| ZeusError::Protocol("DNS failed".into()))?;
 
         let start = Instant::now();
-        let mut conn = TcpConnection::connect(addr, config.timeout).await
+        let mut conn = TcpConnection::connect(addr, config.timeout)
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
 
         // ── Step 1: isMaster — confirm MongoDB ────────────────────────────
         let is_master = build_is_master();
-        conn.write_all(&is_master).await
+        conn.write_all(&is_master)
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
 
         let im_resp = read_mongo_response(&mut conn).await?;
@@ -320,12 +341,15 @@ impl Protocol for MongoDbProtocol {
 
         if im_resp.len() < 20 {
             let _ = conn.shutdown().await;
-            return Ok(AttackResult::Error("MongoDB: invalid isMaster response".into()));
+            return Ok(AttackResult::Error(
+                "MongoDB: invalid isMaster response".into(),
+            ));
         }
 
         // ── Step 2: getnonce — MONGODB-CR ─────────────────────────────────
         let getnonce = build_getnonce();
-        conn.write_all(&getnonce).await
+        conn.write_all(&getnonce)
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
 
         let nonce_resp = read_mongo_response(&mut conn).await?;
@@ -345,7 +369,8 @@ impl Protocol for MongoDbProtocol {
             // ── Step 3: authenticate with MONGODB-CR ──────────────────────
             let key = mongo_cr_key(&cred.username, &cred.password, nonce_str);
             let auth_pkt = build_authenticate(&cred.username, nonce_str, &key);
-            conn.write_all(&auth_pkt).await
+            conn.write_all(&auth_pkt)
+                .await
                 .map_err(|e| ZeusError::Protocol(e.to_string()))?;
 
             let auth_resp = read_mongo_response(&mut conn).await?;
@@ -463,7 +488,7 @@ mod tests {
     #[test]
     fn mongo_cr_key_user_sensitive() {
         let a = mongo_cr_key("alice", "pass", "nonce");
-        let b = mongo_cr_key("bob",   "pass", "nonce");
+        let b = mongo_cr_key("bob", "pass", "nonce");
         assert_ne!(a, b);
     }
 
@@ -488,7 +513,10 @@ mod tests {
         // str_len field = 4 (3 chars + null terminator)
         let key_end = 1 + 3 + 1; // type + "key" + null
         let str_len = u32::from_le_bytes([
-            field[key_end], field[key_end+1], field[key_end+2], field[key_end+3],
+            field[key_end],
+            field[key_end + 1],
+            field[key_end + 2],
+            field[key_end + 3],
         ]);
         assert_eq!(str_len, 4); // "val\0"
     }

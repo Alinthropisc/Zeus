@@ -50,9 +50,15 @@ pub struct CobaltStrikeProtocol;
 
 #[async_trait]
 impl Protocol for CobaltStrikeProtocol {
-    fn name(&self) -> &'static str { "cobaltstrike" }
-    fn default_port(&self) -> u16 { CS_DEFAULT_PORT }
-    fn tls_default(&self) -> bool { true }
+    fn name(&self) -> &'static str {
+        "cobaltstrike"
+    }
+    fn default_port(&self) -> u16 {
+        CS_DEFAULT_PORT
+    }
+    fn tls_default(&self) -> bool {
+        true
+    }
     fn description(&self) -> &'static str {
         "Cobalt Strike Team Server authentication (requires Java serialization protocol)"
     }

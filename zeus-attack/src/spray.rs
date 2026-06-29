@@ -85,7 +85,9 @@ impl PasswordSprayStrategy {
 }
 
 impl AttackStrategy for PasswordSprayStrategy {
-    fn name(&self) -> &'static str { "password-spray" }
+    fn name(&self) -> &'static str {
+        "password-spray"
+    }
 
     fn credentials(&self) -> CredentialStream {
         Box::pin(iter(self.pairs()))
@@ -130,7 +132,8 @@ mod tests {
 
     #[test]
     fn estimated_count() {
-        let s = PasswordSprayStrategy::with_defaults(users(&["a", "b", "c"]), passwords(&["p1", "p2"]));
+        let s =
+            PasswordSprayStrategy::with_defaults(users(&["a", "b", "c"]), passwords(&["p1", "p2"]));
         assert_eq!(s.estimated_count(), Some(6));
     }
 

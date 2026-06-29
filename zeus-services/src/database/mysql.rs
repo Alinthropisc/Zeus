@@ -5,12 +5,12 @@
 //!   Client → HandshakeResponse41 (capabilities, charset, username, auth-response)
 //!   Server → OK_Packet or ERR_Packet
 
+use crate::net::TcpConnection;
 use async_trait::async_trait;
 use std::net::ToSocketAddrs;
 use std::time::Instant;
 use tracing::debug;
 use zeus_core::{AttackConfig, AttackResult, Credential, Protocol, Target, ZeusError};
-use crate::net::TcpConnection;
 use zeus_crypto::{sha1, to_hex};
 
 pub struct MySqlProtocol;
@@ -22,11 +22,11 @@ fn mysql_native_password(password: &str, salt: &[u8]) -> Vec<u8> {
     if password.is_empty() {
         return vec![];
     }
-    let h1 = sha1(password.as_bytes());          // SHA1(pass)
-    let h2 = sha1(&h1);                           // SHA1(SHA1(pass))
+    let h1 = sha1(password.as_bytes()); // SHA1(pass)
+    let h2 = sha1(&h1); // SHA1(SHA1(pass))
     let mut combined = salt.to_vec();
     combined.extend_from_slice(&h2);
-    let h3 = sha1(&combined);                     // SHA1(salt || SHA1(SHA1(pass)))
+    let h3 = sha1(&combined); // SHA1(salt || SHA1(SHA1(pass)))
     h1.iter().zip(h3.iter()).map(|(a, b)| a ^ b).collect()
 }
 
@@ -43,7 +43,9 @@ async fn read_packet(conn: &mut TcpConnection) -> Result<Vec<u8>, ZeusError> {
     // but the *greeting* body may not end with \r\n.  We rely on the fact that
     // `read_until_crlf` breaks on EOF (n==0) too, so for the greeting we get
     // the whole buffer.
-    let buf = conn.read_until_crlf().await
+    let buf = conn
+        .read_until_crlf()
+        .await
         .map_err(|e| ZeusError::Protocol(e.to_string()))?;
     if buf.len() < 4 {
         return Err(ZeusError::Protocol("MySQL: packet too short".into()));
@@ -72,8 +74,12 @@ fn build_handshake_response(username: &str, auth_response: &[u8], database: &str
         | 0x0000_0008              // CLIENT_NO_SCHEMA — omit DB prefix
         | 0x0002_0000              // CLIENT_PROTOCOL_41
         | 0x0008_0000              // CLIENT_SECURE_CONNECTION
-        | 0x0000_0008;             // CLIENT_CONNECT_WITH_DB re-added below
-    let caps: u32 = if !database.is_empty() { caps | 0x0000_0008 } else { caps & !0x0000_0008 };
+        | 0x0000_0008; // CLIENT_CONNECT_WITH_DB re-added below
+    let caps: u32 = if !database.is_empty() {
+        caps | 0x0000_0008
+    } else {
+        caps & !0x0000_0008
+    };
 
     let mut payload = Vec::new();
     payload.extend_from_slice(&caps.to_le_bytes());
@@ -98,9 +104,15 @@ fn build_handshake_response(username: &str, auth_response: &[u8], database: &str
 
 #[async_trait]
 impl Protocol for MySqlProtocol {
-    fn name(&self) -> &'static str { "mysql" }
-    fn default_port(&self) -> u16 { 3306 }
-    fn description(&self) -> &'static str { "MySQL native-password handshake (Protocol 41)" }
+    fn name(&self) -> &'static str {
+        "mysql"
+    }
+    fn default_port(&self) -> u16 {
+        3306
+    }
+    fn description(&self) -> &'static str {
+        "MySQL native-password handshake (Protocol 41)"
+    }
 
     async fn authenticate(
         &self,
@@ -109,11 +121,15 @@ impl Protocol for MySqlProtocol {
         config: &AttackConfig,
     ) -> Result<AttackResult, ZeusError> {
         let addr_str = format!("{}:{}", target.host, target.port);
-        let addr = addr_str.to_socket_addrs().map_err(ZeusError::Network)?
-            .next().ok_or_else(|| ZeusError::Protocol("DNS resolution failed".into()))?;
+        let addr = addr_str
+            .to_socket_addrs()
+            .map_err(ZeusError::Network)?
+            .next()
+            .ok_or_else(|| ZeusError::Protocol("DNS resolution failed".into()))?;
 
         let start = Instant::now();
-        let mut conn = TcpConnection::connect(addr, config.timeout).await
+        let mut conn = TcpConnection::connect(addr, config.timeout)
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
 
         // ── Step 1: receive HandshakeV10 greeting ──────────────────────────
@@ -129,13 +145,16 @@ impl Protocol for MySqlProtocol {
         if greeting[4] == 0xFF {
             // ERR packet before auth — server refused connection
             let _ = conn.shutdown().await;
-            return Ok(AttackResult::Error("MySQL: server sent error before auth".into()));
+            return Ok(AttackResult::Error(
+                "MySQL: server sent error before auth".into(),
+            ));
         }
         if greeting[4] != 0x0A {
             let _ = conn.shutdown().await;
-            return Ok(AttackResult::Error(
-                format!("MySQL: unsupported protocol version {}", greeting[4]),
-            ));
+            return Ok(AttackResult::Error(format!(
+                "MySQL: unsupported protocol version {}",
+                greeting[4]
+            )));
         }
 
         // Skip protocol_version(1) + server_version(null-term string) to find auth-plugin-data
@@ -152,7 +171,9 @@ impl Protocol for MySqlProtocol {
         // auth-plugin-data-part-1 (8 bytes)
         if pos + 8 > greeting.len() {
             let _ = conn.shutdown().await;
-            return Ok(AttackResult::Error("MySQL: greeting truncated at salt1".into()));
+            return Ok(AttackResult::Error(
+                "MySQL: greeting truncated at salt1".into(),
+            ));
         }
         let salt1 = greeting[pos..pos + 8].to_vec();
         pos += 8;
@@ -167,13 +188,21 @@ impl Protocol for MySqlProtocol {
         // capability flags upper 2 bytes
         pos += 2;
         // auth_plugin_data_len (1 byte)
-        let plugin_data_len = if pos < greeting.len() { greeting[pos] as usize } else { 0 };
+        let plugin_data_len = if pos < greeting.len() {
+            greeting[pos] as usize
+        } else {
+            0
+        };
         pos += 1;
         // reserved (10 bytes)
         pos += 10;
 
         // auth-plugin-data-part-2: max(13, plugin_data_len - 8) bytes
-        let part2_len = if plugin_data_len > 8 { plugin_data_len - 8 } else { 13 };
+        let part2_len = if plugin_data_len > 8 {
+            plugin_data_len - 8
+        } else {
+            13
+        };
         let salt2 = if pos + part2_len <= greeting.len() {
             greeting[pos..pos + part2_len].to_vec()
         } else {
@@ -192,7 +221,8 @@ impl Protocol for MySqlProtocol {
         let payload = build_handshake_response(&cred.username, &auth_resp, db);
         let pkt = make_packet(1, &payload);
 
-        conn.write_all(&pkt).await
+        conn.write_all(&pkt)
+            .await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
 
         // ── Step 3: read auth result ───────────────────────────────────────
@@ -200,7 +230,11 @@ impl Protocol for MySqlProtocol {
         let _ = conn.shutdown().await;
 
         // payload starts at offset 4 (after the 3+1 byte header)
-        let resp_type = if result_pkt.len() > 4 { result_pkt[4] } else { 0xFF };
+        let resp_type = if result_pkt.len() > 4 {
+            result_pkt[4]
+        } else {
+            0xFF
+        };
         debug!("MySQL auth result type=0x{:02X}", resp_type);
 
         match resp_type {
@@ -211,7 +245,9 @@ impl Protocol for MySqlProtocol {
             0xFF => Ok(AttackResult::Failure),
             0xFE => {
                 // Auth switch request — plugin other than mysql_native_password
-                Ok(AttackResult::Error("MySQL: auth-switch required (non-native plugin)".into()))
+                Ok(AttackResult::Error(
+                    "MySQL: auth-switch required (non-native plugin)".into(),
+                ))
             }
             _ => Ok(AttackResult::Failure),
         }

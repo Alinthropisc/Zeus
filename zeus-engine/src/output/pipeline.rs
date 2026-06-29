@@ -5,9 +5,9 @@
 
 use std::path::PathBuf;
 
+use crate::output::OutputError;
 use crate::output::builder::Report;
 use crate::output::renderer::{CsvRenderer, JsonRenderer, NucleiRenderer, ReportRenderer};
-use crate::output::OutputError;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ReportPipeline
@@ -35,17 +35,26 @@ impl ReportPipeline {
 
     /// Pipeline that emits pretty-printed JSON.
     pub fn json() -> Self {
-        Self { renderer: Box::new(JsonRenderer), output_path: None }
+        Self {
+            renderer: Box::new(JsonRenderer),
+            output_path: None,
+        }
     }
 
     /// Pipeline that emits flat CSV (one row per finding).
     pub fn csv() -> Self {
-        Self { renderer: Box::new(CsvRenderer), output_path: None }
+        Self {
+            renderer: Box::new(CsvRenderer),
+            output_path: None,
+        }
     }
 
     /// Pipeline that emits Nuclei-compatible JSONL output.
     pub fn nuclei() -> Self {
-        Self { renderer: Box::new(NucleiRenderer), output_path: None }
+        Self {
+            renderer: Box::new(NucleiRenderer),
+            output_path: None,
+        }
     }
 
     /// Set (or replace) the file path the pipeline writes to after rendering.

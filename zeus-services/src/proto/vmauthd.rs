@@ -8,11 +8,11 @@
 //!      - "530 " → failure (login incorrect)
 //!      - Other  → protocol error
 
+use crate::net::TcpConnection;
 use async_trait::async_trait;
 use std::time::Instant;
 use tracing::debug;
 use zeus_core::{AttackConfig, AttackResult, Credential, Protocol, Target, ZeusError};
-use crate::net::TcpConnection;
 
 use crate::resolve_addr;
 
@@ -20,9 +20,15 @@ pub struct VmauthdProtocol;
 
 #[async_trait]
 impl Protocol for VmauthdProtocol {
-    fn name(&self) -> &'static str { "vmauthd" }
-    fn default_port(&self) -> u16 { 902 }
-    fn description(&self) -> &'static str { "VMware Authentication Daemon (vmauthd)" }
+    fn name(&self) -> &'static str {
+        "vmauthd"
+    }
+    fn default_port(&self) -> u16 {
+        902
+    }
+    fn description(&self) -> &'static str {
+        "VMware Authentication Daemon (vmauthd)"
+    }
 
     async fn authenticate(
         &self,
