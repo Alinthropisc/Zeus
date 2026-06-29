@@ -42,7 +42,7 @@ const TNS_LINE_TURNAROUND: u16 = 0x0000;
 const TNS_VALUE_OF_ONE: u16 = 0x0001;
 const TNS_MAX_RECV_CONNECT: u32 = 512;
 const TNS_CONNECT_FLAGS: u8 = 0x04;
-const TNS_CONNECT_FIXED_LEN: usize = 28;
+const TNS_CONNECT_FIXED_LEN: usize = 26;
 const TNS_CONNECT_DATA_OFFSET: u16 = (TNS_HDR_LEN + TNS_CONNECT_FIXED_LEN) as u16;
 
 // Oracle error codes that indicate the SID/service does not exist.
@@ -280,7 +280,7 @@ mod tests {
 
     #[test]
     fn tns_connect_data_offset_is_36() {
-        assert_eq!(TNS_CONNECT_DATA_OFFSET, 36);
+        assert_eq!(TNS_CONNECT_DATA_OFFSET, 34);
     }
 
     #[test]

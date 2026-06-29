@@ -30,3 +30,5 @@ name = "fuzz_cvss_calculator"
 path = "fuzz_targets/fuzz_cvss_calculator.rs"
 test = false
 doc = false
+
+[workspace]

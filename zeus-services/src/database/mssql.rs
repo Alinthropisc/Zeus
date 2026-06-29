@@ -183,10 +183,11 @@ fn build_login7_body(username: &str, password: &str, server: &str) -> Vec<u8> {
     // = 13 fields = 52 bytes for offset+length pairs
     //
     // Data offset starts at: 4 (length) + 36 (fixed) + 52 (table) = 92 bytes into the body.
-    const FIXED_PRE: usize = 36;
+    const FIXED_PRE: usize = 32; // actual bytes: 5×u32 + 4×u8 + 2×u32 = 20+4+8 = 32
     const N_FIELDS: usize = 13;
-    const TABLE_LEN: usize = N_FIELDS * 4;
-    const DATA_START: usize = 4 + FIXED_PRE + TABLE_LEN; // 92
+    // 12 fields use offset(2)+length(2)=4 bytes; client_id (field 10) is 6 bytes inline
+    const TABLE_LEN: usize = (N_FIELDS - 1) * 4 + 6;
+    const DATA_START: usize = 4 + FIXED_PRE + TABLE_LEN; // 90
 
     // Accumulate string data and track offsets (relative to start of body, NOT start of data).
     // The TDS spec says offsets are from the start of the LOGIN7 body (the 4-byte length field).

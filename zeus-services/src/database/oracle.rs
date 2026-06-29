@@ -51,12 +51,12 @@ const TNS_CONNECT_FLAGS: u8 = 0x04;
 
 /// Size of the CONNECT body fixed fields (before the connect data string).
 /// version(2)+compat(2)+svc_opts(2)+sdu(2)+tdu(2)+nt_proto(2)+line_ta(2)+val1(2)
-/// +data_len(2)+data_off(2)+max_recv(4)+flags0(1)+flags1(1) = 28 bytes
-const TNS_CONNECT_FIXED_LEN: usize = 28;
+/// +data_len(2)+data_off(2)+max_recv(4)+flags0(1)+flags1(1) = 26 bytes
+const TNS_CONNECT_FIXED_LEN: usize = 26;
 
 /// Offset at which connect data begins inside the CONNECT body.
 /// The TNS spec says `data_offset` is measured from the start of the FULL packet
-/// (header + body).  We set it to HDR_LEN + CONNECT_FIXED_LEN = 8 + 28 = 36.
+/// (header + body).  We set it to HDR_LEN + CONNECT_FIXED_LEN = 8 + 26 = 34.
 const TNS_CONNECT_DATA_OFFSET: u16 = (TNS_HDR_LEN + TNS_CONNECT_FIXED_LEN) as u16;
 
 // ── TNS packet builder ────────────────────────────────────────────────────────
@@ -396,7 +396,7 @@ mod tests {
 
     #[test]
     fn tns_connect_data_offset_matches_header_expectation() {
-        // The constant must equal HDR(8) + FIXED_BODY(28) = 36.
-        assert_eq!(TNS_CONNECT_DATA_OFFSET, 36);
+        // The constant must equal HDR(8) + FIXED_BODY(26) = 34.
+        assert_eq!(TNS_CONNECT_DATA_OFFSET, 34);
     }
 }

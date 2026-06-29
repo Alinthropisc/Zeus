@@ -346,7 +346,7 @@ mod tests {
 
     #[test]
     fn vector_labels_are_distinct() {
-        let vectors = vec![
+        let vectors = [
             SsrfVector::OAuthRedirectUri {
                 callback_url: "http://x.com".into(),
             },

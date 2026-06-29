@@ -710,8 +710,8 @@ mod tests {
 
     #[test]
     fn ntlm_nt_hash_known() {
-        // Known NT hash: NTLM("Password") = 8846f7eaee8fb117ad06bdd830b7586c
-        let hash = ntlm_nt_hash("Password");
+        // Known NT hash: NTLM("password") = 8846f7eaee8fb117ad06bdd830b7586c
+        let hash = ntlm_nt_hash("password");
         let expected = hex::decode("8846f7eaee8fb117ad06bdd830b7586c").unwrap();
         assert_eq!(&hash[..], &expected[..]);
     }
