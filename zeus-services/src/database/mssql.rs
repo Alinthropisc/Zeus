@@ -46,7 +46,7 @@ fn tds_encode_password(password: &str) -> Vec<u8> {
         .flat_map(|c| c.to_le_bytes())
         .map(|b| {
             let xored = b ^ 0xA5;
-            (xored >> 4) | (xored << 4)
+            xored.rotate_left(4)
         })
         .collect()
 }

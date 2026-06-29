@@ -30,7 +30,7 @@ impl Protocol for TelnetProtocol {
         let addr_str = format!("{}:{}", target.host, target.port);
         let addr = addr_str
             .to_socket_addrs()
-            .map_err(|e| ZeusError::Network(e))?
+            .map_err(ZeusError::Network)?
             .next()
             .ok_or_else(|| ZeusError::Protocol("DNS failed".into()))?;
 

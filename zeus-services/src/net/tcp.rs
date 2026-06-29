@@ -62,7 +62,7 @@ impl TcpConnection {
     pub async fn read_line(&mut self) -> Result<String> {
         let buf = self.read_until(b"\n").await?;
         let s = String::from_utf8_lossy(&buf);
-        Ok(s.trim_end_matches(|c| c == '\r' || c == '\n').to_owned())
+        Ok(s.trim_end_matches(['\r', '\n']).to_owned())
     }
 
     /// Read exactly `n` bytes.
@@ -181,7 +181,7 @@ impl TlsConnection {
     pub async fn read_line(&mut self) -> Result<String> {
         let buf = self.read_until(b"\n").await?;
         let s = String::from_utf8_lossy(&buf);
-        Ok(s.trim_end_matches(|c| c == '\r' || c == '\n').to_owned())
+        Ok(s.trim_end_matches(['\r', '\n']).to_owned())
     }
 
     pub async fn read_exact(&mut self, n: usize) -> Result<BytesMut> {

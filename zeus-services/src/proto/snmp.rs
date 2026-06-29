@@ -119,7 +119,7 @@ impl Protocol for SnmpProtocol {
         })
         .await
         .map_err(|e| ZeusError::Protocol(e.to_string()))?
-        .map_err(|e| ZeusError::Protocol(e))?;
+        .map_err(ZeusError::Protocol)?;
 
         if result {
             Ok(AttackResult::Success {

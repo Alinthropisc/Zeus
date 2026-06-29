@@ -512,12 +512,12 @@ fn extract_param(header: &str, name: &str) -> Option<String> {
     let pattern = format!("{}=", name);
     let start = header.find(&pattern)? + pattern.len();
     let rest = &header[start..];
-    if rest.starts_with('"') {
-        let end = rest[1..].find('"')? + 1;
-        Some(rest[1..end].to_string())
+    if let Some(rest_inner) = rest.strip_prefix('"') {
+        let end = rest_inner.find('"')?;
+        Some(rest_inner[..end].to_string())
     } else {
         let end = rest
-            .find(|c: char| c == ',' || c == ' ')
+            .find([',', ' '])
             .unwrap_or(rest.len());
         Some(rest[..end].to_string())
     }

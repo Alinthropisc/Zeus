@@ -9,8 +9,10 @@
 //!   3. Read server response (ACCEPT / REFUSE / RESYNC)
 //!   4. Send TNS DATA carrying `(CONNECT_DATA=(COMMAND=status))` to probe
 //!      whether the listener requires a password
+//!
 //!   5a. If response contains "(STATUS=" with no "1189" error → listener is
-//!       open (no password set) → report as Error("open")
+//!        open (no password set) → report as Error("open")
+//!
 //!   5b. If response contains "1189" → listener requires a password
 //!   6. Send TNS DATA with the SET_PASSWORD / STATUS+password command and
 //!      check for error "1189" in the reply.

@@ -25,7 +25,7 @@ fn xdr_string(s: &str) -> Vec<u8> {
     let mut out = Vec::with_capacity(4 + bytes.len() + pad);
     out.extend_from_slice(&len.to_be_bytes());
     out.extend_from_slice(bytes);
-    out.extend(std::iter::repeat(0u8).take(pad));
+    out.extend(std::iter::repeat_n(0u8, pad));
     out
 }
 

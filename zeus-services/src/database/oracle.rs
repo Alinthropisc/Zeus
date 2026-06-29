@@ -130,12 +130,13 @@ fn build_auth_start(username: &str) -> Vec<u8> {
     //
     // The body below uses the Oracle Net Services "NS2" data packet format:
     //   call_id(1) = 0x60 (Authentication), num_params(1), key=value pairs
-    let mut ns_body: Vec<u8> = Vec::new();
     // NS2 AUTH_SESS_KEY call: call_id=0x73 (Authentication-UNAME)
-    ns_body.push(0x00); // NS2 version
-    ns_body.push(0x60); // AUTH call
-    ns_body.push(0x00); // flags
-    ns_body.push(0x00); // ACL flags
+    let mut ns_body: Vec<u8> = vec![
+        0x00, // NS2 version
+        0x60, // AUTH call
+        0x00, // flags
+        0x00, // ACL flags
+    ];
     // username length (1 byte for short names) and data
     ns_body.push(username.len() as u8);
     ns_body.extend_from_slice(username.as_bytes());

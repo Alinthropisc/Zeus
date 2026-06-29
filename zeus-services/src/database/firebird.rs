@@ -59,7 +59,7 @@ fn xdr_string(buf: &mut Vec<u8>, data: &[u8]) {
     xdr_i32(buf, data.len() as i32);
     buf.extend_from_slice(data);
     let pad = (4usize.wrapping_sub(data.len() % 4)) % 4;
-    buf.extend(std::iter::repeat(0u8).take(pad));
+    buf.extend(std::iter::repeat_n(0u8, pad));
 }
 
 /// Read a big-endian i32 from `buf` at `pos`.  Returns `None` if out of bounds.

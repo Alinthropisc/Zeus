@@ -123,7 +123,7 @@ pub fn afp_login(username: &str, password: &str) -> Vec<u8> {
     data.push(uname_bytes.len() as u8);
     data.extend_from_slice(uname_bytes);
     // After adding length(1) + chars(n), if total is even add a pad byte.
-    if (1 + uname_bytes.len()) % 2 == 0 {
+    if (1 + uname_bytes.len()).is_multiple_of(2) {
         data.push(0x00);
     }
 

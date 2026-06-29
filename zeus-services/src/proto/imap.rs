@@ -80,8 +80,6 @@ impl Protocol for ImapProtocol {
                 credential: cred.clone(),
                 elapsed: start.elapsed(),
             })
-        } else if resp_str.contains("NO") || resp_str.contains("BAD") {
-            Ok(AttackResult::Failure)
         } else {
             Ok(AttackResult::Failure)
         }

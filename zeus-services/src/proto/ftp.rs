@@ -30,7 +30,7 @@ impl Protocol for FtpProtocol {
         let addr_str = format!("{}:{}", target.host, target.port);
         let addr = addr_str
             .to_socket_addrs()
-            .map_err(|e| ZeusError::Network(e))?
+            .map_err(ZeusError::Network)?
             .next()
             .ok_or_else(|| ZeusError::Protocol("DNS resolution failed".into()))?;
 
@@ -78,8 +78,6 @@ impl Protocol for FtpProtocol {
                 credential: cred.clone(),
                 elapsed: start.elapsed(),
             })
-        } else if resp_str.starts_with("421") || resp_str.starts_with("530") {
-            Ok(AttackResult::Failure)
         } else {
             Ok(AttackResult::Failure)
         }

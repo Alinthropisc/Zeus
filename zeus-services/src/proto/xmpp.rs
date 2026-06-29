@@ -104,8 +104,6 @@ impl Protocol for XmppProtocol {
                 credential: cred.clone(),
                 elapsed: start.elapsed(),
             })
-        } else if resp_str.contains("<failure") {
-            Ok(AttackResult::Failure)
         } else {
             Ok(AttackResult::Failure)
         }

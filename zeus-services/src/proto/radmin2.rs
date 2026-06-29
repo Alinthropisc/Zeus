@@ -22,7 +22,7 @@ fn md5(data: &[u8]) -> [u8; 16] {
 fn radmin_checksum(type_byte: u8, data: &[u8]) -> u32 {
     let mut buf = vec![type_byte];
     buf.extend_from_slice(data);
-    while buf.len() % 4 != 0 {
+    while !buf.len().is_multiple_of(4) {
         buf.push(0);
     }
     let mut sum: u32 = 0;

@@ -16,7 +16,7 @@ fn crc32(data: &[u8]) -> u32 {
     static TABLE: OnceLock<[u32; 256]> = OnceLock::new();
     let table = TABLE.get_or_init(|| {
         let mut t = [0u32; 256];
-        for i in 0..256 {
+        for (i, item) in t.iter_mut().enumerate() {
             let mut c = i as u32;
             for _ in 0..8 {
                 c = if c & 1 != 0 {
@@ -25,7 +25,7 @@ fn crc32(data: &[u8]) -> u32 {
                     c >> 1
                 };
             }
-            t[i] = c;
+            *item = c;
         }
         t
     });

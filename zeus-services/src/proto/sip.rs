@@ -33,8 +33,7 @@ fn parse_header_value<'a>(header: &'a str, key: &str) -> Option<&'a str> {
     let needle = format!("{}=", key);
     let start = header.find(needle.as_str())? + needle.len();
     let rest = &header[start..];
-    if rest.starts_with('"') {
-        let inner = &rest[1..];
+    if let Some(inner) = rest.strip_prefix('"') {
         let end = inner.find('"')?;
         Some(&inner[..end])
     } else {
@@ -65,6 +64,7 @@ fn build_register(host: &str, port: u16, user: &str, call_id: &str, cseq: u32) -
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 fn build_register_auth(
     host: &str,
     port: u16,
@@ -241,7 +241,7 @@ fn rand_u32() -> u32 {
         .duration_since(SystemTime::UNIX_EPOCH)
         .map(|d| d.subsec_nanos())
         .unwrap_or(42);
-    (nanos ^ (std::process::id() << 16)) as u32
+    nanos ^ (std::process::id() << 16)
 }
 
 #[cfg(test)]
