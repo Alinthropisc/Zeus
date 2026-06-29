@@ -1,7 +1,10 @@
 [advisories]
 db-path = "~/.cargo/advisory-db"
 db-urls = ["https://github.com/rustsec/advisory-db"]
-ignore = []
+ignore = [
+    # paste crate is archived but safe; ratatui depends on it, no upgrade available
+    "RUSTSEC-2024-0436",
+]
 
 [licenses]
 allow = [
@@ -12,12 +15,9 @@ allow = [
     "BSD-3-Clause",
     "ISC",
     "Unicode-3.0",
-    "Unicode-DFS-2016",
     "CC0-1.0",
-    "OpenSSL",
     "Zlib",
-    "MPL-2.0",
-    "0BSD",
+    "CDLA-Permissive-2.0",
 ]
 
 [bans]
