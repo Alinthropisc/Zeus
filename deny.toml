@@ -19,7 +19,6 @@ allow = [
     "MPL-2.0",
     "0BSD",
 ]
-copyleft = "warn"
 
 [bans]
 multiple-versions = "warn"
