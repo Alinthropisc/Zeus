@@ -1,0 +1,24 @@
+[package]
+name = "zeus-services"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[dependencies]
+zeus-core    = { workspace = true }
+async-trait  = { workspace = true }
+dashmap      = { workspace = true }
+tracing      = { workspace = true }
+tokio        = { workspace = true }
+anyhow       = { workspace = true }
+bytes        = { workspace = true }
+tokio-rustls = { workspace = true }
+rustls       = { workspace = true }
+webpki-roots = { workspace = true }
+reqwest      = { workspace = true }
+serde_json   = { workspace = true }
+md-5         = { workspace = true }

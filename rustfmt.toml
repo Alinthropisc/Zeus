@@ -1,0 +1,26 @@
+edition = "2024"
+max_width = 100
+tab_spaces = 4
+newline_style = "Unix"
+reorder_imports = true
+reorder_modules = true
+use_field_init_shorthand = true
+use_try_shorthand = true
+
+# The settings below require a nightly rustfmt; keeping them out of the
+# stable config so `cargo fmt` doesn't spam warnings on CI. Re-enable
+# in a separate config if you run nightly locally:
+#
+#   imports_granularity   = "Module"
+#   group_imports         = "StdExternalCrate"
+#   wrap_comments         = true
+#   comment_width         = 100
+#   normalize_comments    = true
+#   normalize_doc_attributes = true
+#   format_strings        = false
+#   format_macro_matchers = true
+#   fn_single_line        = false
+#   where_single_line     = false
+#   trailing_comma        = "Vertical"
+#   trailing_semicolon    = true
+#   condense_wildcard_suffixes = true

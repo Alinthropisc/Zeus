@@ -1,0 +1,96 @@
+[workspace]
+members = [
+    "zeus-core",
+    "zeus-macros",
+    "zeus-attack",
+    "zeus-engine",
+    "zeus-crypto",
+    "zeus-services",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+authors = ["Ali <sayavdera@gmail.com>"]
+license = "MIT"
+repository = "https://github.com/sayavdera/zeus"
+keywords = ["security", "pentesting", "network", "authentication", "research"]
+categories = ["network-programming", "command-line-utilities"]
+
+[package]
+name = "zeus"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Zeus — async network login auditing tool (educational purposes only)"
+
+[[bin]]
+name = "zeus"
+path = "src/main.rs"
+
+[dependencies]
+zeus-core = { path = "zeus-core" }
+zeus-engine = { path = "zeus-engine" }
+zeus-attack = { path = "zeus-attack" }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+clap = { workspace = true }
+ratatui = { workspace = true }
+crossterm = { workspace = true }
+anyhow = { workspace = true }
+serde = { workspace = true }
+config = { workspace = true }
+
+[dev-dependencies]
+zeus-services = { path = "zeus-services" }
+zeus-attack   = { path = "zeus-attack" }
+zeus-core     = { path = "zeus-core" }
+tokio         = { workspace = true }
+futures       = { workspace = true }
+tokio-stream  = { workspace = true }
+async-trait   = { workspace = true }
+tempfile      = "3"
+
+[workspace.dependencies]
+zeus-core = { path = "zeus-core" }
+zeus-macros = { path = "zeus-macros" }
+zeus-attack = { path = "zeus-attack" }
+zeus-engine = { path = "zeus-engine" }
+zeus-crypto = { path = "zeus-crypto" }
+zeus-services = { path = "zeus-services" }
+tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.12", features = ["rustls-tls", "json"], default-features = false }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "fmt"] }
+anyhow = "1"
+thiserror = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+config = { version = "0.14", features = ["toml"] }
+async-trait = "0.1"
+sha1 = "0.10"
+sha2 = "0.10"
+md-5 = "0.10"
+hmac = "0.12"
+hex = "0.4"
+base64 = "0.22"
+clap = { version = "4", features = ["derive", "env"] }
+ratatui = "0.29"
+crossterm = "0.28"
+futures = "0.3"
+tokio-stream = "0.1"
+uuid = { version = "1", features = ["v4"] }
+bytes = "1"
+parking_lot = "0.12"
+dashmap = "6"
+rand = "0.8"
+chrono = { version = "0.4", features = ["serde"] }
+tonic = "0.12"
+prost = "0.13"
+tokio-rustls = "0.26"
+rustls = { version = "0.23", features = ["ring"] }
+webpki-roots = "0.26"
+

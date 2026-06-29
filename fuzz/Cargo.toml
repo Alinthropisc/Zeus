@@ -1,0 +1,32 @@
+[package]
+name = "zeus-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+zeus-core  = { path = "../zeus-core" }
+zeus-attack = { path = "../zeus-attack" }
+zeus-output = { path = "../zeus-output" }
+
+[[bin]]
+name = "fuzz_credential_parser"
+path = "fuzz_targets/fuzz_credential_parser.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_response_analyzer"
+path = "fuzz_targets/fuzz_response_analyzer.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_cvss_calculator"
+path = "fuzz_targets/fuzz_cvss_calculator.rs"
+test = false
+doc = false

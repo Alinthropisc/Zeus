@@ -1,0 +1,39 @@
+[package]
+name = "zeus-engine"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Attack engine and session orchestration for Zeus"
+
+[dependencies]
+zeus-core     = { workspace = true }
+zeus-services = { workspace = true }
+zeus-attack   = { workspace = true }
+async-trait   = { workspace = true }
+tokio         = { workspace = true }
+tokio-stream  = { workspace = true }
+tracing       = { workspace = true }
+thiserror     = { workspace = true }
+anyhow        = { workspace = true }
+futures       = { workspace = true }
+serde         = { workspace = true }
+serde_json    = { workspace = true }
+uuid          = { workspace = true }
+parking_lot   = { workspace = true }
+tokio-util    = { version = "0.7", features = ["rt"] }
+bytes         = { workspace = true }
+tokio-rustls  = { workspace = true }
+rustls        = { workspace = true }
+webpki-roots  = { workspace = true }
+reqwest       = { workspace = true }
+md-5          = { workspace = true }
+dashmap       = { workspace = true }
+rand          = { workspace = true }
+chrono        = { workspace = true }
+
+[dev-dependencies]
+tokio         = { workspace = true }
+async-trait   = { workspace = true }
+tokio-stream  = { workspace = true }
+serde_json    = { workspace = true }
