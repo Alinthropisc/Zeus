@@ -7,7 +7,7 @@ use tokio::sync::broadcast;
 use zeus_core::ProgressEvent;
 
 use crate::tui::events::{AppEvent, next_event};
-use crate::tui::screens::{AttackStats, DashboardScreen, Screen, ScreenTransition};
+use crate::tui::screens::{DashboardScreen, Screen, ScreenTransition};
 
 const TICK: Duration = Duration::from_millis(100);
 
@@ -32,10 +32,7 @@ impl TuiApp {
         }
     }
 
-    pub async fn run(
-        mut self,
-        terminal: &mut Terminal<CrosstermBackend<Stdout>>,
-    ) -> Result<()> {
+    pub async fn run(mut self, terminal: &mut Terminal<CrosstermBackend<Stdout>>) -> Result<()> {
         loop {
             // Draw whichever screen is on top.
             terminal.draw(|frame| {
@@ -84,18 +81,27 @@ impl TuiApp {
 
     pub fn apply_progress(&mut self, event: ProgressEvent) {
         match event {
-            ProgressEvent::SessionStarted { estimated_total, .. } => {
+            ProgressEvent::SessionStarted {
+                estimated_total, ..
+            } => {
                 self.dashboard.stats.total = estimated_total;
                 self.dashboard.stats.started_at = Some(Instant::now());
             }
-            ProgressEvent::Attempt { credential, result, attempts_done, .. } => {
+            ProgressEvent::Attempt {
+                credential,
+                result,
+                attempts_done,
+                ..
+            } => {
                 self.dashboard.stats.attempts = attempts_done;
                 if result.is_success() {
                     self.dashboard.stats.found.push(credential.clone());
                     self.dashboard.push_log(format!("[FOUND] {}", credential));
                 }
             }
-            ProgressEvent::Stats { attempts_per_sec, .. } => {
+            ProgressEvent::Stats {
+                attempts_per_sec, ..
+            } => {
                 self.dashboard.stats.rate_per_sec = attempts_per_sec;
             }
             ProgressEvent::SessionFinished {

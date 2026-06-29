@@ -1,9 +1,9 @@
 use ratatui::{
+    Frame,
     layout::Rect,
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Gauge, Paragraph, Row, Table},
-    Frame,
 };
 use zeus_core::Credential;
 
@@ -54,12 +54,19 @@ impl<'a> StatsTable<'a> {
         let header = Row::new(vec!["Username", "Password"])
             .style(Style::default().add_modifier(Modifier::BOLD));
 
-        let table = Table::new(rows, [
-            ratatui::layout::Constraint::Percentage(50),
-            ratatui::layout::Constraint::Percentage(50),
-        ])
+        let table = Table::new(
+            rows,
+            [
+                ratatui::layout::Constraint::Percentage(50),
+                ratatui::layout::Constraint::Percentage(50),
+            ],
+        )
         .header(header)
-        .block(Block::default().borders(Borders::ALL).title("Found Credentials"));
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title("Found Credentials"),
+        );
 
         frame.render_widget(table, area);
     }

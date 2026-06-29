@@ -62,13 +62,19 @@ fn log_buffer_never_exceeds_capacity() {
 #[test]
 fn dashboard_q_returns_quit() {
     let mut dash = DashboardScreen::new();
-    assert!(matches!(dash.handle_key(key(KeyCode::Char('q'))), ScreenTransition::Quit));
+    assert!(matches!(
+        dash.handle_key(key(KeyCode::Char('q'))),
+        ScreenTransition::Quit
+    ));
 }
 
 #[test]
 fn dashboard_capital_q_returns_quit() {
     let mut dash = DashboardScreen::new();
-    assert!(matches!(dash.handle_key(key(KeyCode::Char('Q'))), ScreenTransition::Quit));
+    assert!(matches!(
+        dash.handle_key(key(KeyCode::Char('Q'))),
+        ScreenTransition::Quit
+    ));
 }
 
 #[test]
@@ -88,7 +94,10 @@ fn dashboard_question_mark_pushes_help_screen() {
 #[test]
 fn dashboard_unrecognised_key_stays() {
     let mut dash = DashboardScreen::new();
-    assert!(matches!(dash.handle_key(key(KeyCode::Char('x'))), ScreenTransition::Stay));
+    assert!(matches!(
+        dash.handle_key(key(KeyCode::Char('x'))),
+        ScreenTransition::Stay
+    ));
 }
 
 // ── HelpScreen key handling ───────────────────────────────────────────────────
@@ -96,39 +105,61 @@ fn dashboard_unrecognised_key_stays() {
 #[test]
 fn help_esc_pops() {
     let mut h = HelpScreen;
-    assert!(matches!(h.handle_key(key(KeyCode::Esc)), ScreenTransition::Pop));
+    assert!(matches!(
+        h.handle_key(key(KeyCode::Esc)),
+        ScreenTransition::Pop
+    ));
 }
 
 #[test]
 fn help_q_pops() {
     let mut h = HelpScreen;
-    assert!(matches!(h.handle_key(key(KeyCode::Char('q'))), ScreenTransition::Pop));
+    assert!(matches!(
+        h.handle_key(key(KeyCode::Char('q'))),
+        ScreenTransition::Pop
+    ));
 }
 
 #[test]
 fn help_question_mark_pops() {
     let mut h = HelpScreen;
-    assert!(matches!(h.handle_key(key(KeyCode::Char('?'))), ScreenTransition::Pop));
+    assert!(matches!(
+        h.handle_key(key(KeyCode::Char('?'))),
+        ScreenTransition::Pop
+    ));
 }
 
 #[test]
 fn help_other_key_stays() {
     let mut h = HelpScreen;
-    assert!(matches!(h.handle_key(key(KeyCode::Enter)), ScreenTransition::Stay));
+    assert!(matches!(
+        h.handle_key(key(KeyCode::Enter)),
+        ScreenTransition::Stay
+    ));
 }
 
 // ── ResultsScreen key handling ────────────────────────────────────────────────
 
 #[test]
 fn results_esc_pops() {
-    let mut r = ResultsScreen { stats: Default::default() };
-    assert!(matches!(r.handle_key(key(KeyCode::Esc)), ScreenTransition::Pop));
+    let mut r = ResultsScreen {
+        stats: Default::default(),
+    };
+    assert!(matches!(
+        r.handle_key(key(KeyCode::Esc)),
+        ScreenTransition::Pop
+    ));
 }
 
 #[test]
 fn results_q_pops() {
-    let mut r = ResultsScreen { stats: Default::default() };
-    assert!(matches!(r.handle_key(key(KeyCode::Char('q'))), ScreenTransition::Pop));
+    let mut r = ResultsScreen {
+        stats: Default::default(),
+    };
+    assert!(matches!(
+        r.handle_key(key(KeyCode::Char('q'))),
+        ScreenTransition::Pop
+    ));
 }
 
 // ── TuiApp::apply_progress (state machine) ───────────────────────────────────
@@ -174,7 +205,12 @@ fn tuiapp_warning_appends_to_log() {
 
     app.apply_progress(ProgressEvent::Warning("test warning".to_string()));
 
-    assert!(app.dashboard.log_lines.iter().any(|l| l.contains("test warning")));
+    assert!(
+        app.dashboard
+            .log_lines
+            .iter()
+            .any(|l| l.contains("test warning"))
+    );
 }
 
 #[test]

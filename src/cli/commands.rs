@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use async_trait::async_trait;
 use std::sync::{
     Arc,
@@ -7,10 +7,9 @@ use std::sync::{
 use std::time::Duration;
 use tracing::info;
 use zeus_attack::{AttackStrategy, DictionaryStrategy, Wordlist};
-use zeus_core::{AttackConfigBuilder, Credential, ProgressEvent};
+use zeus_core::{AttackConfigBuilder, ProgressEvent};
 use zeus_engine::Engine;
 use zeus_services::registry::ProtocolRegistry;
-use tokio::sync::broadcast;
 
 use crate::cli::config::AppConfig;
 
@@ -80,12 +79,12 @@ impl ZeusCommand for AttackCommand {
             "Starting attack"
         );
 
-        let userlist = Wordlist::from_file(&cfg.userlist_path)
-            .map_err(|e| anyhow::anyhow!("{}", e))?;
+        let userlist =
+            Wordlist::from_file(&cfg.userlist_path).map_err(|e| anyhow::anyhow!("{}", e))?;
         let usernames: Vec<String> = userlist.passwords().map(str::to_string).collect();
 
-        let passlist = Wordlist::from_file(&cfg.passlist_path)
-            .map_err(|e| anyhow::anyhow!("{}", e))?;
+        let passlist =
+            Wordlist::from_file(&cfg.passlist_path).map_err(|e| anyhow::anyhow!("{}", e))?;
 
         let strategy: Box<dyn AttackStrategy> =
             Box::new(DictionaryStrategy::new(usernames, passlist));
@@ -100,8 +99,17 @@ impl ZeusCommand for AttackCommand {
 
         // Drain remaining events (already finished, but flush the channel).
         while let Ok(event) = rx.try_recv() {
-            if let ProgressEvent::SessionFinished { total_attempts, rate_per_second, .. } = event {
-                info!(attempts = total_attempts, rate = rate_per_second, "Session finished");
+            if let ProgressEvent::SessionFinished {
+                total_attempts,
+                rate_per_second,
+                ..
+            } = event
+            {
+                info!(
+                    attempts = total_attempts,
+                    rate = rate_per_second,
+                    "Session finished"
+                );
             }
         }
 
@@ -152,6 +160,26 @@ impl ZeusCommand for ProbeCommand {
 
 pub struct ListCommand;
 
+#[async_trait]
+impl ZeusCommand for ListCommand {
+    fn name(&self) -> &str {
+        "list"
+    }
+
+    async fn execute(self: Box<Self>, ctx: CommandContext) -> Result<()> {
+        let protocols = ctx.registry.list();
+        if protocols.is_empty() {
+            println!("No protocols registered.");
+        } else {
+            println!("Available protocols:");
+            for p in &protocols {
+                println!("  {}", p);
+            }
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -186,25 +214,5 @@ mod tests {
     #[test]
     fn attack_command_name_is_attack() {
         assert_eq!(AttackCommand.name(), "attack");
-    }
-}
-
-#[async_trait]
-impl ZeusCommand for ListCommand {
-    fn name(&self) -> &str {
-        "list"
-    }
-
-    async fn execute(self: Box<Self>, ctx: CommandContext) -> Result<()> {
-        let protocols = ctx.registry.list();
-        if protocols.is_empty() {
-            println!("No protocols registered.");
-        } else {
-            println!("Available protocols:");
-            for p in &protocols {
-                println!("  {}", p);
-            }
-        }
-        Ok(())
     }
 }

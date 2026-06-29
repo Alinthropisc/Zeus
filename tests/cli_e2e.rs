@@ -15,15 +15,24 @@ fn zeus_bin() -> Command {
 
 #[test]
 fn help_flag_exits_zero() {
-    let out = zeus_bin().arg("--help").output().expect("failed to spawn zeus");
+    let out = zeus_bin()
+        .arg("--help")
+        .output()
+        .expect("failed to spawn zeus");
     assert!(out.status.success(), "zeus --help exited non-zero");
     let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(stdout.contains("zeus"), "help output should contain binary name");
+    assert!(
+        stdout.contains("zeus"),
+        "help output should contain binary name"
+    );
 }
 
 #[test]
 fn version_flag_exits_zero() {
-    let out = zeus_bin().arg("--version").output().expect("failed to spawn zeus");
+    let out = zeus_bin()
+        .arg("--version")
+        .output()
+        .expect("failed to spawn zeus");
     assert!(out.status.success(), "zeus --version exited non-zero");
 }
 
@@ -31,7 +40,10 @@ fn version_flag_exits_zero() {
 
 #[test]
 fn list_subcommand_exits_zero() {
-    let out = zeus_bin().arg("list").output().expect("failed to spawn zeus list");
+    let out = zeus_bin()
+        .arg("list")
+        .output()
+        .expect("failed to spawn zeus list");
     assert!(
         out.status.success(),
         "zeus list exited {:?}\nstderr: {}",
@@ -42,7 +54,10 @@ fn list_subcommand_exits_zero() {
 
 #[test]
 fn list_subcommand_produces_output() {
-    let out = zeus_bin().arg("list").output().expect("failed to spawn zeus list");
+    let out = zeus_bin()
+        .arg("list")
+        .output()
+        .expect("failed to spawn zeus list");
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(!stdout.is_empty(), "zeus list should print something");
 }
@@ -51,7 +66,10 @@ fn list_subcommand_produces_output() {
 
 #[test]
 fn attack_without_args_exits_nonzero() {
-    let out = zeus_bin().arg("attack").output().expect("failed to spawn zeus attack");
+    let out = zeus_bin()
+        .arg("attack")
+        .output()
+        .expect("failed to spawn zeus attack");
     assert!(
         !out.status.success(),
         "zeus attack without required args should exit non-zero"
@@ -72,7 +90,10 @@ fn attack_missing_target_exits_nonzero() {
 
 #[test]
 fn probe_help_exits_zero() {
-    let out = zeus_bin().args(["probe", "--help"]).output().expect("failed to spawn");
+    let out = zeus_bin()
+        .args(["probe", "--help"])
+        .output()
+        .expect("failed to spawn");
     assert!(out.status.success());
 }
 
@@ -80,6 +101,9 @@ fn probe_help_exits_zero() {
 
 #[test]
 fn unknown_subcommand_exits_nonzero() {
-    let out = zeus_bin().arg("doesnotexist").output().expect("failed to spawn");
+    let out = zeus_bin()
+        .arg("doesnotexist")
+        .output()
+        .expect("failed to spawn");
     assert!(!out.status.success());
 }

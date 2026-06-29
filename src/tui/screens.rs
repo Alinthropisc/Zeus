@@ -1,10 +1,10 @@
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
+    Frame,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph},
-    Frame,
 };
 use std::time::{Duration, Instant};
 use zeus_core::Credential;
@@ -97,8 +97,16 @@ impl Screen for DashboardScreen {
             elapsed,
         );
         let header = Paragraph::new(header_text)
-            .style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
-            .block(Block::default().borders(Borders::ALL).title("Zeus Attack Dashboard"));
+            .style(
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            )
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title("Zeus Attack Dashboard"),
+            );
         frame.render_widget(header, chunks[0]);
 
         let pb = ProgressBar {
@@ -140,7 +148,10 @@ impl Screen for DashboardScreen {
         LogPane { lines: &last_log }.render(frame, mid[1]);
 
         let help = Paragraph::new(Line::from(vec![
-            Span::styled(" q", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                " q",
+                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+            ),
             Span::raw(" quit  "),
             Span::styled(" r", Style::default().fg(Color::Green)),
             Span::raw(" results  "),
@@ -175,7 +186,10 @@ impl Screen for ResultsScreen {
             .constraints([Constraint::Min(5), Constraint::Length(1)])
             .split(area);
 
-        StatsTable { found: &self.stats.found }.render(frame, chunks[0]);
+        StatsTable {
+            found: &self.stats.found,
+        }
+        .render(frame, chunks[0]);
 
         let help = Paragraph::new(" ESC / q — back");
         frame.render_widget(help, chunks[1]);
@@ -203,8 +217,7 @@ impl Screen for HelpScreen {
             Line::from("  ?           — this help screen"),
             Line::from("  ESC         — go back"),
         ];
-        let para = Paragraph::new(text)
-            .block(Block::default().borders(Borders::ALL).title("Help"));
+        let para = Paragraph::new(text).block(Block::default().borders(Borders::ALL).title("Help"));
         frame.render_widget(para, area);
     }
 

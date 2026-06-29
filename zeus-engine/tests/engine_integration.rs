@@ -4,9 +4,7 @@
 
 use std::time::Duration;
 use zeus_core::{AttackConfig, AttackResult, Credential};
-use zeus_engine::{
-    DispatchStrategy, SequentialStrategy, SessionStats, StopOnFirstStrategy,
-};
+use zeus_engine::{DispatchStrategy, SequentialStrategy, SessionStats, StopOnFirstStrategy};
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 

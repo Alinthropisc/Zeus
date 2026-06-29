@@ -14,7 +14,9 @@ use zeus_services::registry::ProtocolRegistry;
 
 use cli::{
     args::{ZeusArgs, ZeusSubcommand},
-    commands::{AttackCommand, CommandContext, ListCommand, ProbeCommand, ShutdownToken, ZeusCommand},
+    commands::{
+        AttackCommand, CommandContext, ListCommand, ProbeCommand, ShutdownToken, ZeusCommand,
+    },
     config::AppConfig,
 };
 

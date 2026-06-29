@@ -25,10 +25,10 @@ pub async fn next_event(
     }
 
     // Poll crossterm for terminal input.
-    if event::poll(timeout).unwrap_or(false) {
-        if let Ok(Event::Key(key)) = event::read() {
-            return AppEvent::Key(key);
-        }
+    if event::poll(timeout).unwrap_or(false)
+        && let Ok(Event::Key(key)) = event::read()
+    {
+        return AppEvent::Key(key);
     }
 
     AppEvent::Tick
@@ -57,7 +57,8 @@ mod tests {
     #[tokio::test]
     async fn next_event_returns_progress_when_broadcast_has_message() {
         let (tx, mut rx) = tokio::sync::broadcast::channel(8);
-        tx.send(ProgressEvent::Warning("hello".to_string())).unwrap();
+        tx.send(ProgressEvent::Warning("hello".to_string()))
+            .unwrap();
 
         let event = next_event(&mut rx, Duration::from_millis(0)).await;
         assert!(matches!(event, AppEvent::Progress(_)));

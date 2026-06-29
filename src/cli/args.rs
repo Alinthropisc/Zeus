@@ -69,11 +69,16 @@ mod tests {
     #[test]
     fn attack_subcommand_parses_correctly() {
         let args = ZeusArgs::try_parse_from([
-            "zeus", "attack",
-            "-t", "localhost:22",
-            "-p", "ssh",
-            "-U", "users.txt",
-            "-P", "pass.txt",
+            "zeus",
+            "attack",
+            "-t",
+            "localhost:22",
+            "-p",
+            "ssh",
+            "-U",
+            "users.txt",
+            "-P",
+            "pass.txt",
         ])
         .expect("should parse");
         match args.command {
@@ -91,12 +96,18 @@ mod tests {
     #[test]
     fn threads_flag_overrides_default() {
         let args = ZeusArgs::try_parse_from([
-            "zeus", "attack",
-            "-t", "localhost:22",
-            "-p", "ssh",
-            "-U", "users.txt",
-            "-P", "pass.txt",
-            "-T", "20",
+            "zeus",
+            "attack",
+            "-t",
+            "localhost:22",
+            "-p",
+            "ssh",
+            "-U",
+            "users.txt",
+            "-P",
+            "pass.txt",
+            "-T",
+            "20",
         ])
         .expect("should parse");
         match args.command {
@@ -113,10 +124,8 @@ mod tests {
 
     #[test]
     fn probe_subcommand_parses() {
-        let args = ZeusArgs::try_parse_from([
-            "zeus", "probe", "-t", "localhost:80", "-p", "http",
-        ])
-        .expect("should parse");
+        let args = ZeusArgs::try_parse_from(["zeus", "probe", "-t", "localhost:80", "-p", "http"])
+            .expect("should parse");
         match args.command {
             ZeusSubcommand::Probe(p) => {
                 assert_eq!(p.target, "localhost:80");
