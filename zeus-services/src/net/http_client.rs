@@ -105,7 +105,6 @@ impl HttpClientBuilder {
         let mut builder = reqwest::Client::builder()
             .timeout(self.timeout)
             .use_rustls_tls()
-            .cookie_store(self.cookie_store)
             .danger_accept_invalid_certs(self.danger_accept_invalid_certs)
             .user_agent(&self.user_agent);
 

@@ -9,7 +9,7 @@
 //! ```
 //! A summary object is appended after the array.
 
-use crate::{OutputError, OutputWriter};
+use crate::output::{OutputError, OutputWriter};
 use async_trait::async_trait;
 use chrono::Utc;
 use serde_json::{json, Value};
@@ -157,7 +157,6 @@ impl<W: Write + Send + Sync> OutputWriter for JsonWriter<W> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::Duration;
 
     fn make_writer() -> JsonWriter<Vec<u8>> {
         JsonWriter::new(Vec::new())
@@ -177,7 +176,7 @@ mod tests {
         let mut w = make_writer();
         w.write_found(&Credential::new("root", "toor")).await.unwrap();
         let raw = {
-            let boxed: Box<JsonWriter<Vec<u8>>> = Box::new(w);
+            let _boxed: Box<JsonWriter<Vec<u8>>> = Box::new(w);
             let buf_writer = {
                 // We can't recover the inner writer after close, so
                 // capture it via a shared buffer approach using the writer.
@@ -244,7 +243,7 @@ mod tests {
 
     #[tokio::test]
     async fn close_without_found_writes_empty_array_and_summary() {
-        let w: JsonWriter<Vec<u8>> = JsonWriter::new(Vec::new());
+        let _w: JsonWriter<Vec<u8>> = JsonWriter::new(Vec::new());
         let mut out_buf = Vec::new();
         {
             let mut inner: JsonWriter<&mut Vec<u8>> = JsonWriter::new(&mut out_buf);

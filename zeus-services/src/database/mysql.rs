@@ -188,7 +188,7 @@ impl Protocol for MySqlProtocol {
 
         // ── Step 2: send HandshakeResponse41 ──────────────────────────────
         let auth_resp = mysql_native_password(&cred.password, &salt);
-        let db = target.service.as_deref().unwrap_or("");
+        let db = target.path.as_deref().unwrap_or("");
         let payload = build_handshake_response(&cred.username, &auth_resp, db);
         let pkt = make_packet(1, &payload);
 

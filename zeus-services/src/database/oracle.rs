@@ -211,7 +211,7 @@ impl Protocol for OracleProtocol {
         let mut conn = TcpConnection::connect(addr, config.timeout).await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
 
-        let service = target.service.as_deref().unwrap_or("orcl");
+        let service = target.path.as_deref().unwrap_or("XE");
         let desc = connect_descriptor(&target.host, port, service);
         debug!("Oracle: connect descriptor = {}", desc);
 

@@ -5,6 +5,7 @@
 
 use parking_lot::RwLock;
 use std::collections::HashMap;
+use std::fmt;
 use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -31,6 +32,12 @@ struct CachedEntry {
 pub struct DnsCache {
     cache: Arc<RwLock<HashMap<String, CachedEntry>>>,
     ttl: Duration,
+}
+
+impl fmt::Debug for DnsCache {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("DnsCache").finish_non_exhaustive()
+    }
 }
 
 impl DnsCache {

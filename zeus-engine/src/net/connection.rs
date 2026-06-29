@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
-use crate::TcpConnection;
+use crate::net::TcpConnection;
 
 // ──────────────────────────────────────────────────────────────────────────────
 // ConnectionPool

@@ -84,7 +84,7 @@ impl<W: Write + Send + Sync> OutputWriter for TextWriter<W> {
                     target.host
                 )?;
             }
-            ProgressEvent::SessionFinished { found, total_attempts, elapsed } => {
+            ProgressEvent::SessionFinished { found, total_attempts, elapsed, .. } => {
                 writeln!(
                     self.out,
                     "{CYAN}[=]{RESET} Session finished: {} found, {} attempts, {:.1}s",
@@ -163,6 +163,12 @@ mod tests {
             found: vec![Credential::new("r", "t")],
             total_attempts: 42,
             elapsed: std::time::Duration::from_secs(3),
+            successes: 1,
+            failures: 41,
+            errors: 0,
+            rate_limits: 0,
+            timeouts: 0,
+            rate_per_second: 14.0,
         };
         w.write_event(&event).await.unwrap();
         let s = output(w);

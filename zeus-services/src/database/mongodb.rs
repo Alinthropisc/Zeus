@@ -37,6 +37,7 @@ const ADMIN_CMD: &[u8] = b"admin.$cmd\x00";
 // ── BSON helpers ──────────────────────────────────────────────────────────────
 
 /// BSON element types used here.
+#[allow(dead_code)]
 #[repr(u8)]
 enum BsonType {
     Double   = 0x01,
@@ -76,6 +77,7 @@ fn bson_str(key: &str, val: &str) -> Vec<u8> {
 }
 
 /// Encode a BSON embedded document field.
+#[allow(dead_code)]
 fn bson_document_field(key: &str, inner: &[u8]) -> Vec<u8> {
     let doc_len = (inner.len() + 5) as u32; // 4 len + content + 0x00
     let mut out = vec![BsonType::Document as u8];

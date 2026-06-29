@@ -3,7 +3,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::finding::Finding;
+use crate::output::finding::Finding;
 
 /// A fully assembled security report.
 #[derive(Debug, Clone, Serialize, Deserialize)]

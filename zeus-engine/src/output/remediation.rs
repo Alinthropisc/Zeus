@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use crate::finding::FindingCategory;
+use crate::output::finding::FindingCategory;
 
 /// Provides pre-built remediation advice for every known finding category.
 pub struct RemediationDb {

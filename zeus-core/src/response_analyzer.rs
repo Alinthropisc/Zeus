@@ -415,6 +415,9 @@ impl ResponseAnalyzer {
             if url_lower.contains("dashboard") || url_lower.contains("home") {
                 evidence.push(format!("redirect to {}", url));
                 confidence += 0.5;
+                if matches!(_status, 301 | 302 | 303 | 307 | 308) {
+                    confidence += 0.4;
+                }
             }
         }
 

@@ -2,7 +2,7 @@
 
 use uuid::Uuid;
 
-use crate::finding::{Finding, Severity};
+use crate::output::finding::{Finding, Severity};
 
 /// Maps CVSS base scores to [`Severity`] levels and computes false-positive rates.
 pub struct SeverityScorer;

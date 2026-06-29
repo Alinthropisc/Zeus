@@ -6,6 +6,7 @@ use zeus_core::ZeusError;
 
 /// Resolve `host:port` to a `SocketAddr`, returning `ZeusError` on failure.
 /// Used by every protocol to avoid duplicating DNS resolution code.
+#[allow(dead_code)]
 pub(crate) fn resolve_addr(host: &str, port: u16) -> Result<SocketAddr, ZeusError> {
     format!("{}:{}", host, port).to_socket_addrs().map_err(ZeusError::Network)?.next().ok_or_else(|| ZeusError::Protocol("DNS resolution failed".into()))
 }

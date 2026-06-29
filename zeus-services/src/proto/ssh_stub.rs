@@ -5,6 +5,7 @@
 //! without pulling in any external SSH dependency.
 
 use async_trait::async_trait;
+use std::fmt;
 use std::sync::Arc;
 use std::time::Instant;
 use zeus_core::{AttackConfig, AttackResult, Credential, Protocol, Target, ZeusError};
@@ -29,7 +30,7 @@ impl Protocol for SshProtocol {
 
 // ─── Observer pattern (retained for API compatibility) ────────────────────────
 
-pub trait TimingObserver: Send + Sync {
+pub trait TimingObserver: Send + Sync + fmt::Debug {
     fn on_sample(&self, user: &str, duration: std::time::Duration);
 }
 

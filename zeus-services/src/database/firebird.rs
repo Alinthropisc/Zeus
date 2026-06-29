@@ -153,7 +153,7 @@ impl Protocol for FirebirdProtocol {
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
 
         // Database path: use the configured service name or a sensible default.
-        let db_name = target.service.as_deref().unwrap_or("/tmp/probe.fdb");
+        let db_name = target.path.as_deref().unwrap_or("employee");
         let db_path = db_name.as_bytes();
 
         // ── Step 1: op_connect ────────────────────────────────────────────

@@ -23,7 +23,7 @@ pub struct CredentialStuffingPipeline {
     entries: Vec<BreachEntry>,
     domain_filter: Option<String>,
     normalize_usernames: bool,
-    source: String,
+    _source: String,
 }
 
 impl CredentialStuffingPipeline {
@@ -54,7 +54,7 @@ impl CredentialStuffingPipeline {
             entries,
             domain_filter: None,
             normalize_usernames: false,
-            source,
+            _source: source,
         }
     }
 

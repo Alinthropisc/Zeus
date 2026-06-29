@@ -102,68 +102,10 @@ pub fn ntlm_nt_hash(password: &str) -> [u8; 16] {
     md4(&utf16)
 }
 
-/// Minimal MD4 implementation for NTLM (RFC 1320).
-/// MD4 is intentionally weak — only use for NTLM compatibility, never for new designs.
+/// MD4 hash (RFC 1320) via RustCrypto.
+/// Only for NTLM compatibility — intentionally weak, never use for new designs.
 pub fn md4(data: &[u8]) -> [u8; 16] {
-    let f = |x: u32, y: u32, z: u32| (x & y) | (!x & z);
-    let g = |x: u32, y: u32, z: u32| (x & y) | (x & z) | (y & z);
-    let h = |x: u32, y: u32, z: u32| x ^ y ^ z;
-
-    // Padding per RFC 1320
-    let bit_len = (data.len() as u64).wrapping_mul(8);
-    let mut msg = data.to_vec();
-    msg.push(0x80);
-    while msg.len() % 64 != 56 {
-        msg.push(0x00);
-    }
-    msg.extend_from_slice(&bit_len.to_le_bytes());
-
-    let mut a: u32 = 0x6745_2301;
-    let mut b: u32 = 0xEFCD_AB89;
-    let mut c: u32 = 0x98BA_DCFE;
-    let mut d: u32 = 0x1032_5476;
-
-    for block in msg.chunks_exact(64) {
-        let x: Vec<u32> = block.chunks_exact(4)
-            .map(|c| u32::from_le_bytes([c[0], c[1], c[2], c[3]]))
-            .collect();
-
-        let (aa, bb, cc, dd) = (a, b, c, d);
-
-        // Round 1
-        for &i in &[0usize, 4, 8, 12] {
-            a = (a.wrapping_add(f(b,c,d)).wrapping_add(x[i  ])).rotate_left(3);
-            d = (d.wrapping_add(f(a,b,c)).wrapping_add(x[i+1])).rotate_left(7);
-            c = (c.wrapping_add(f(d,a,b)).wrapping_add(x[i+2])).rotate_left(11);
-            b = (b.wrapping_add(f(c,d,a)).wrapping_add(x[i+3])).rotate_left(19);
-        }
-        // Round 2
-        for &i in &[0usize, 1, 2, 3] {
-            a = (a.wrapping_add(g(b,c,d)).wrapping_add(x[i  ]).wrapping_add(0x5A82_7999)).rotate_left(3);
-            d = (d.wrapping_add(g(a,b,c)).wrapping_add(x[i+4]).wrapping_add(0x5A82_7999)).rotate_left(5);
-            c = (c.wrapping_add(g(d,a,b)).wrapping_add(x[i+8]).wrapping_add(0x5A82_7999)).rotate_left(9);
-            b = (b.wrapping_add(g(c,d,a)).wrapping_add(x[i+12]).wrapping_add(0x5A82_7999)).rotate_left(13);
-        }
-        // Round 3
-        for &i in &[0usize, 2, 1, 3] {
-            a = (a.wrapping_add(h(b,c,d)).wrapping_add(x[i  ]).wrapping_add(0x6ED9_EBA1)).rotate_left(3);
-            d = (d.wrapping_add(h(a,b,c)).wrapping_add(x[i+8]).wrapping_add(0x6ED9_EBA1)).rotate_left(9);
-            c = (c.wrapping_add(h(d,a,b)).wrapping_add(x[i+4]).wrapping_add(0x6ED9_EBA1)).rotate_left(11);
-            b = (b.wrapping_add(h(c,d,a)).wrapping_add(x[i+12]).wrapping_add(0x6ED9_EBA1)).rotate_left(15);
-        }
-
-        a = a.wrapping_add(aa);
-        b = b.wrapping_add(bb);
-        c = c.wrapping_add(cc);
-        d = d.wrapping_add(dd);
-    }
-
-    let mut out = [0u8; 16];
-    out[0..4].copy_from_slice(&a.to_le_bytes());
-    out[4..8].copy_from_slice(&b.to_le_bytes());
-    out[8..12].copy_from_slice(&c.to_le_bytes());
-    out[12..16].copy_from_slice(&d.to_le_bytes());
-    out
+    <md4::Md4 as md4::Digest>::digest(data).into()
 }
 
 #[cfg(test)]
@@ -198,7 +140,7 @@ mod tests {
         // RFC 2202 test vector #1: key=0x0b*16, data="Hi There"
         let key = vec![0x0bu8; 16];
         let result = hmac_md5(&key, b"Hi There");
-        assert_eq!(to_hex(&result), "9294727a3811f1f5e8b0d9d5be6d3c7b");
+        assert_eq!(to_hex(&result), "9294727a3638bb1c13f48ef8158bfc9d");
     }
 
     #[test]
@@ -218,14 +160,41 @@ mod tests {
 
     #[test]
     fn md4_empty() {
-        // MD4("") = 31d6cfe0d16ae931b73c59d7e0c089c0
         assert_eq!(to_hex(&md4(b"")), "31d6cfe0d16ae931b73c59d7e0c089c0");
     }
 
     #[test]
+    fn md4_abc() {
+        // RFC 1320 test vector
+        assert_eq!(to_hex(&md4(b"abc")), "a448017aaf21d8525fc10ae87aa6729d");
+    }
+
+    #[test]
+    fn md4_known_bytes() {
+        // MD4 of UTF-16LE bytes for "password" (lowercase)
+        let bytes: &[u8] = &[0x70, 0x00, 0x61, 0x00, 0x73, 0x00, 0x73, 0x00,
+                              0x77, 0x00, 0x6F, 0x00, 0x72, 0x00, 0x64, 0x00];
+        assert_eq!(to_hex(&md4(bytes)), "8846f7eaee8fb117ad06bdd830b7586c");
+    }
+
+    #[test]
+    fn ntlm_utf16le_encoding() {
+        let bytes: Vec<u8> = "password"
+            .encode_utf16()
+            .flat_map(|c| c.to_le_bytes())
+            .collect();
+        assert_eq!(
+            bytes,
+            vec![0x70, 0x00, 0x61, 0x00, 0x73, 0x00, 0x73, 0x00,
+                 0x77, 0x00, 0x6F, 0x00, 0x72, 0x00, 0x64, 0x00]
+        );
+    }
+
+    #[test]
     fn ntlm_nt_hash_known() {
-        // NT hash of "Password" = 8846f7eaee8fb117ad06bdd830b7586c
-        assert_eq!(to_hex(&ntlm_nt_hash("Password")), "8846f7eaee8fb117ad06bdd830b7586c");
+        // NT hash of "password" (lowercase) = 8846f7eaee8fb117ad06bdd830b7586c
+        // (universally-known NTLM rainbow-table test vector)
+        assert_eq!(to_hex(&ntlm_nt_hash("password")), "8846f7eaee8fb117ad06bdd830b7586c");
     }
 
     #[test]
@@ -233,6 +202,6 @@ mod tests {
         let challenge = to_base64(b"test");
         let resp = cram_md5_response("user", "secret", &challenge).unwrap();
         assert!(resp.starts_with("user "));
-        assert_eq!(resp.len(), "user ".len() + 32); // 32 hex chars
+        assert_eq!(resp.len(), "user ".len() + 32);
     }
 }

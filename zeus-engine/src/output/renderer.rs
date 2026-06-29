@@ -3,15 +3,16 @@
 //! Each `*Renderer` implements [`ReportRenderer`] and produces a different
 //! textual representation of the same report data.
 
-use crate::builder::Report;
-use crate::OutputError;
+use crate::output::builder::Report;
+use crate::output::OutputError;
+use std::fmt;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Visitor trait
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Visitor trait — each renderer "visits" a [`Report`] and returns a string.
-pub trait ReportRenderer {
+pub trait ReportRenderer: Send + Sync + fmt::Debug {
     fn render(&self, report: &Report) -> Result<String, OutputError>;
 }
 
@@ -20,6 +21,7 @@ pub trait ReportRenderer {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Serialises the full report as pretty-printed JSON.
+#[derive(Debug)]
 pub struct JsonRenderer;
 
 impl ReportRenderer for JsonRenderer {
@@ -36,6 +38,7 @@ impl ReportRenderer for JsonRenderer {
 /// Flat CSV with one row per finding.
 ///
 /// Columns: `id,title,severity,category,cvss_score,remediation,timestamp`
+#[derive(Debug)]
 pub struct CsvRenderer;
 
 impl ReportRenderer for CsvRenderer {
@@ -73,6 +76,7 @@ impl ReportRenderer for CsvRenderer {
 ///
 /// Each object carries: `templateID`, `host`, `matched-at`, `severity`,
 /// `name`, `description`.
+#[derive(Debug)]
 pub struct NucleiRenderer;
 
 impl ReportRenderer for NucleiRenderer {
@@ -106,6 +110,7 @@ impl ReportRenderer for NucleiRenderer {
 /// Renders the report timeline as human-readable ASCII.
 ///
 /// Format: `[HH:MM:SS] EVENT_TYPE | detail`
+#[derive(Debug)]
 pub struct TimelineRenderer;
 
 impl ReportRenderer for TimelineRenderer {
@@ -129,11 +134,12 @@ impl ReportRenderer for TimelineRenderer {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Self-contained HTML report — all CSS is inlined; no external dependencies.
+#[derive(Debug)]
 pub struct HtmlRenderer;
 
 impl HtmlRenderer {
-    fn severity_color(severity: &crate::finding::Severity) -> &'static str {
-        use crate::finding::Severity;
+    fn severity_color(severity: &crate::output::finding::Severity) -> &'static str {
+        use crate::output::finding::Severity;
         match severity {
             Severity::Critical => "#dc2626",
             Severity::High     => "#ea580c",
@@ -143,7 +149,7 @@ impl HtmlRenderer {
         }
     }
 
-    fn severity_badge(severity: &crate::finding::Severity) -> String {
+    fn severity_badge(severity: &crate::output::finding::Severity) -> String {
         let label = severity.to_string();
         let css_class = label.to_lowercase();
         format!(r#"<span class="badge badge-{css_class}">{label}</span>"#)
@@ -151,7 +157,7 @@ impl HtmlRenderer {
 
     fn count_by_severity(
         report: &Report,
-        target: &crate::finding::Severity,
+        target: &crate::output::finding::Severity,
     ) -> usize {
         report.findings.iter().filter(|f| &f.severity == target).count()
     }
@@ -159,7 +165,7 @@ impl HtmlRenderer {
 
 impl ReportRenderer for HtmlRenderer {
     fn render(&self, report: &Report) -> Result<String, OutputError> {
-        use crate::finding::Severity;
+        use crate::output::finding::Severity;
 
         let generated_at = report.metadata.generated_at.format("%Y-%m-%d %H:%M:%S UTC");
 
@@ -324,8 +330,8 @@ fn html_escape(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::builder::ReportBuilder;
-    use crate::finding::{Finding, FindingCategory, Severity};
+    use crate::output::builder::ReportBuilder;
+    use crate::output::finding::{Finding, FindingCategory, Severity};
 
     fn sample_report() -> Report {
         let finding = Finding::new(

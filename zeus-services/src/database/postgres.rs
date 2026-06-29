@@ -93,7 +93,7 @@ impl Protocol for PostgresProtocol {
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;
 
         // ── Step 1: send StartupMessage ────────────────────────────────────
-        let db = target.service.as_deref().unwrap_or(&cred.username);
+        let db = target.path.as_deref().unwrap_or("postgres");
         let startup = build_startup(&cred.username, db);
         conn.write_all(&startup).await
             .map_err(|e| ZeusError::Protocol(e.to_string()))?;

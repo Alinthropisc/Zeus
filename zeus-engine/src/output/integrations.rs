@@ -3,7 +3,7 @@
 //! No HTTP calls are made here — callers supply the transport (e.g. reqwest).
 //! This keeps the module fully testable without a live server.
 
-use crate::finding::{Finding, Severity};
+use crate::output::finding::{Finding, Severity};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DefectDojo
@@ -189,7 +189,7 @@ impl JiraClient {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::finding::{Finding, FindingCategory, Severity};
+    use crate::output::finding::{Finding, FindingCategory, Severity};
 
     fn critical_finding() -> Finding {
         Finding::new(

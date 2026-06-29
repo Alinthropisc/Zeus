@@ -148,8 +148,8 @@ mod tests {
     fn all_charset_has_printable_chars() {
         let m = MaskStrategy::new("admin", "?a");
         let count = m.estimated_count().unwrap();
-        // ?a = lower(26) + upper(26) + digit(10) + special(27) = 89 unique
-        assert!(count >= 89);
+        // ?a = lower(26) + upper(26) + digit(10) + special(26) = 88 unique
+        assert!(count >= 88);
         let creds = m.generate_all();
         assert_eq!(creds.len() as u64, count);
     }

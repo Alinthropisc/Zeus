@@ -225,7 +225,7 @@ fn build_session_setup_negotiate() -> Vec<u8> {
     // SMB2 SESSION_SETUP request body
     let security_buffer_offset: u16 = 64 + 25; // SMB2 header (64) + SESSION_SETUP body up to security blob
     let security_buffer_length = gss_neg_token_init.len() as u16;
-    let total_body_size = 25u16 + security_buffer_length; // SESSION_SETUP StructureSize=25 + blob
+    let _total_body_size = 25u16 + security_buffer_length; // SESSION_SETUP StructureSize=25 + blob
 
     let mut body = Vec::new();
     body.extend_from_slice(&[0x19, 0x00]); // StructureSize = 25
@@ -268,7 +268,7 @@ fn build_session_setup_negotiate() -> Vec<u8> {
 /// Wrap an NTLMSSP token in a minimal GSS-API NegTokenInit envelope.
 fn build_gss_ntlmssp(ntlmssp: &[u8]) -> Vec<u8> {
     // SPNEGO OID: 1.3.6.1.5.5.2
-    let spnego_oid = &[0x06, 0x06, 0x2b, 0x06, 0x01, 0x05, 0x05, 0x02];
+    let spnego_oid: &[u8] = &[0x06, 0x06, 0x2b, 0x06, 0x01, 0x05, 0x05, 0x02];
     // NTLMSSP OID: 1.3.6.1.4.1.311.2.2.10
     let ntlm_oid = &[
         0x06, 0x0a, 0x2b, 0x06, 0x01, 0x04, 0x01, 0x82, 0x37, 0x02, 0x02, 0x0a,
@@ -287,7 +287,7 @@ fn build_gss_ntlmssp(ntlmssp: &[u8]) -> Vec<u8> {
     let neg_token_init = der_context(0, &neg_token_init_inner);
 
     // GSSAPI InitialContextToken: APPLICATION [0] { spnego_oid, NegTokenInit }
-    let inner = [spnego_oid as &[u8], &neg_token_init].concat();
+    let inner = [spnego_oid, neg_token_init.as_slice()].concat();
     der_application(0, &inner)
 }
 
@@ -484,7 +484,7 @@ fn build_session_setup_auth(
     username: &str,
     domain: &str,
     ntlmv2_response: &[u8],
-    nt_hash: &[u8; 16],
+    _nt_hash: &[u8; 16],
 ) -> Vec<u8> {
     // NTLMSSP_AUTH message
     // Layout:
@@ -510,7 +510,7 @@ fn build_session_setup_auth(
     let lm_response = [0u8; 24]; // LMv2 response (zeroed for NTLMv2-only)
 
     // Compute offsets (all fields packed after the fixed 72-byte header)
-    let base_offset: u32 = 72 + 8 + 16; // header(72) + version(8) + MIC(16) = 96? Let's compute carefully
+    let _base_offset: u32 = 72 + 8 + 16; // header(72) + version(8) + MIC(16) = 96? Let's compute carefully
     // Fixed NTLMSSP_AUTH header size:
     //   8 (sig) + 4 (type) + 8*6 (6 field descriptors) + 8 (flags and reserved) + 8 (version) + 16 (MIC) = 8+4+48+4+4+8+16
     // Actually standard layout: sig(8)+type(4)+LmResponse(8)+NtResponse(8)+Domain(8)+User(8)+Workstation(8)+SessionKey(8)+flags(4)+version(8)+mic(16) = 88

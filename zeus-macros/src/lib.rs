@@ -475,6 +475,7 @@ fn camel_to_snake_no_suffix(s: &str) -> String {
 /// # Requirements
 /// The target type must implement both `Default` and `zeus_core::Protocol`
 /// (all unit structs satisfy `Default` automatically).
+#[allow(unused_macros)]
 macro_rules! zeus_protocol_test {
     // ── TLS variant ──────────────────────────────────────────────────────────
     ($proto:ty, name = $name:expr, port = $port:expr, tls = $tls:expr) => {

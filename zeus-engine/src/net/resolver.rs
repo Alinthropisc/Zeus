@@ -3,10 +3,9 @@
 //! Handles IP literals directly (no DNS), and delegates hostnames to
 //! [`DnsCache`] for cached async resolution.
 
-use crate::dns::DnsCache;
+use crate::net::dns::DnsCache;
 use std::net::{IpAddr, SocketAddr};
 use std::str::FromStr;
-use std::time::Duration;
 
 // ──────────────────────────────────────────────────────────────────────────────
 // AddressResolver

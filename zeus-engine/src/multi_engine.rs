@@ -176,8 +176,6 @@ impl MultiEngine {
 mod tests {
     use super::*;
     use async_trait::async_trait;
-    use std::sync::atomic::{AtomicU64, Ordering};
-    use std::time::Duration;
     use tokio_stream::iter as stream_iter;
     use zeus_attack::{AttackStrategy, CredentialStream};
     use zeus_core::{AttackConfig, AttackConfigBuilder, AttackResult, Credential, Protocol, Target, ZeusError};

@@ -28,6 +28,7 @@ struct RateLimiterInner {
     original_rate: f64,
     refill_rate: f64,
     last_refill: Instant,
+    #[allow(dead_code)]
     burst_size: f64,
     /// Total successful `acquire` calls.
     total_acquired: u64,

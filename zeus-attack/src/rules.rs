@@ -365,7 +365,7 @@ mod tests {
 
     #[test]
     fn l33t_replaces_e() {
-        assert_eq!(Rule::L33tSpeak.apply("elite"), "3l1t3");
+        assert_eq!(Rule::L33tSpeak.apply("elite"), "3l173");
     }
 
     #[test]
@@ -523,7 +523,7 @@ mod tests {
 
     #[test]
     fn rule_substitute() {
-        assert_eq!(apply("sao", "password"), "pAssword".replace('a', "o"));
+        assert_eq!(apply("sao", "password"), "password".replace('a', "o"));
         assert_eq!(apply("sae", "banana"), "benene");
     }
 

@@ -5,7 +5,7 @@
 //! Internal double-quotes are escaped by doubling them (""), and every field
 //! value is wrapped in quotes per RFC 4180.
 
-use crate::{OutputError, OutputWriter};
+use crate::output::{OutputError, OutputWriter};
 use async_trait::async_trait;
 use std::io::{self, Write};
 use std::path::Path;

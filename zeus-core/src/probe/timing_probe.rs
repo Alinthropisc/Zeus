@@ -111,21 +111,26 @@ impl TimingProbe {
             })
             .collect();
 
-        // Global baseline: mean and std-dev of all per-username means.
-        let all_means: Vec<f64> = means.values().copied().collect();
-        let baseline_mean = all_means.iter().sum::<f64>() / all_means.len() as f64;
-        let variance = all_means
-            .iter()
-            .map(|&m| (m - baseline_mean).powi(2))
-            .sum::<f64>()
-            / all_means.len() as f64;
-        let baseline_std = variance.sqrt();
-
-        // Flag usernames exceeding threshold.
+        // Flag usernames using leave-one-out baseline so the outlier
+        // does not pull the baseline mean toward itself.
         let mut findings = Vec::new();
         for (username, mean_ms) in &means {
+            let others: Vec<f64> = means
+                .iter()
+                .filter(|(u, _)| *u != username)
+                .map(|(_, &m)| m)
+                .collect();
+            if others.is_empty() {
+                continue;
+            }
+            let baseline_mean = others.iter().sum::<f64>() / others.len() as f64;
+            let variance = others.iter().map(|&m| (m - baseline_mean).powi(2)).sum::<f64>()
+                / others.len() as f64;
+            let baseline_std = variance.sqrt();
             let sigma_above = if baseline_std > 0.0 {
                 (mean_ms - baseline_mean) / baseline_std
+            } else if *mean_ms > baseline_mean {
+                f64::INFINITY
             } else {
                 0.0
             };

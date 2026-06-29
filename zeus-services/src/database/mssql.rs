@@ -132,6 +132,7 @@ fn build_prelogin_body() -> Vec<u8> {
 /// Fixed header is 36 bytes of metadata, then offset/length pairs for all
 /// variable-length fields (host, user, password, app, server, …), then the
 /// string data itself.
+#[allow(unused_assignments)]
 fn build_login7_body(username: &str, password: &str, server: &str) -> Vec<u8> {
     // TDS 7.4
     const TDS_VERSION:    u32 = 0x0400_0074;
@@ -175,21 +176,7 @@ fn build_login7_body(username: &str, password: &str, server: &str) -> Vec<u8> {
     let mut string_data: Vec<u8> = Vec::new();
     let mut next_offset = DATA_START as u16;
 
-    let mut push_field = |data: &[u8], out: &mut Vec<u8>| -> (u16, u16) {
-        let char_len = (data.len() / 2) as u16; // for UTF-16: char count = byte count / 2
-        if data.is_empty() {
-            out.extend_from_slice(&[0u8; 0]);
-            return (0, 0);
-        }
-        let off = next_offset;
-        out.extend_from_slice(data);
-        // we need to mutate next_offset — use closure captures won't work easily, so
-        // we return (off, char_len) and update next_offset outside.
-        (off, char_len)
-    };
-
-    // We need mutable `next_offset` alongside the closure, which doesn't mix in Rust.
-    // Inline each field manually instead.
+    // Offset/length tracking is handled inline via the macro below.
     macro_rules! field {
         ($data:expr) => {{
             if $data.is_empty() {
@@ -228,8 +215,6 @@ fn build_login7_body(username: &str, password: &str, server: &str) -> Vec<u8> {
     let (at_off, at_len): (u16, u16) = (0, 0);
     // ChangePassword: empty
     let (cp_off, cp_len): (u16, u16) = (0, 0);
-
-    let _ = push_field; // suppress unused warning
 
     let total_body_len = DATA_START + string_data.len();
 

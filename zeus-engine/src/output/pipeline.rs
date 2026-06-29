@@ -5,9 +5,9 @@
 
 use std::path::PathBuf;
 
-use crate::builder::Report;
-use crate::renderer::{CsvRenderer, JsonRenderer, NucleiRenderer, ReportRenderer};
-use crate::OutputError;
+use crate::output::builder::Report;
+use crate::output::renderer::{CsvRenderer, JsonRenderer, NucleiRenderer, ReportRenderer};
+use crate::output::OutputError;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ReportPipeline
