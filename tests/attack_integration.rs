@@ -847,7 +847,7 @@ mod wordlist {
         let mut tmp = tempfile::NamedTempFile::new().expect("temp file must be created");
         writeln!(tmp, "# comment line").expect("write comment");
         writeln!(tmp, "secret1").expect("write entry 1");
-        writeln!(tmp, "").expect("write blank line");
+        writeln!(tmp).expect("write blank line");
         writeln!(tmp, "secret2").expect("write entry 2");
 
         let list = Wordlist::from_file(tmp.path()).expect("from_file must succeed on a valid file");

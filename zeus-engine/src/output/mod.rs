@@ -96,10 +96,10 @@ impl OutputManager {
     pub async fn broadcast_found(&mut self, cred: &Credential) -> Result<(), OutputError> {
         let mut first_err: Option<OutputError> = None;
         for w in &mut self.writers {
-            if let Err(e) = w.write_found(cred).await {
-                if first_err.is_none() {
-                    first_err = Some(e);
-                }
+            if let Err(e) = w.write_found(cred).await
+                && first_err.is_none()
+            {
+                first_err = Some(e);
             }
         }
         match first_err {
@@ -114,10 +114,10 @@ impl OutputManager {
     pub async fn broadcast_event(&mut self, event: &ProgressEvent) -> Result<(), OutputError> {
         let mut first_err: Option<OutputError> = None;
         for w in &mut self.writers {
-            if let Err(e) = w.write_event(event).await {
-                if first_err.is_none() {
-                    first_err = Some(e);
-                }
+            if let Err(e) = w.write_event(event).await
+                && first_err.is_none()
+            {
+                first_err = Some(e);
             }
         }
         match first_err {
@@ -133,10 +133,10 @@ impl OutputManager {
     pub async fn close_all(self) -> Result<(), OutputError> {
         let mut first_err: Option<OutputError> = None;
         for w in self.writers {
-            if let Err(e) = w.close().await {
-                if first_err.is_none() {
-                    first_err = Some(e);
-                }
+            if let Err(e) = w.close().await
+                && first_err.is_none()
+            {
+                first_err = Some(e);
             }
         }
         match first_err {
@@ -166,6 +166,7 @@ mod tests {
     }
 
     impl TestWriter {
+        #[allow(clippy::type_complexity)]
         fn new() -> (
             Self,
             Arc<Mutex<Vec<String>>>,

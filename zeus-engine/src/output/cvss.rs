@@ -63,7 +63,7 @@ impl CvssV3Builder {
             2 => AttackVector::Local,
             _ => AttackVector::Physical,
         };
-        let ac = if data[1] % 2 == 0 {
+        let ac = if data[1].is_multiple_of(2) {
             AttackComplexity::Low
         } else {
             AttackComplexity::High
@@ -73,12 +73,12 @@ impl CvssV3Builder {
             1 => PrivilegesRequired::Low,
             _ => PrivilegesRequired::High,
         };
-        let ui = if data[3] % 2 == 0 {
+        let ui = if data[3].is_multiple_of(2) {
             UserInteraction::None
         } else {
             UserInteraction::Required
         };
-        let sc = if data[4] % 2 == 0 {
+        let sc = if data[4].is_multiple_of(2) {
             Scope::Unchanged
         } else {
             Scope::Changed

@@ -255,10 +255,11 @@ impl GlobalRateLimiter {
                 map.entry(host.to_string()).or_insert(new_rl);
             }
             // Acquire from the (possibly newly inserted) limiter
-            let map = self.per_host.lock();
-            if let Some(rl) = map.get(host) {
-                let arc = Arc::clone(&rl.inner);
-                drop(map);
+            let arc_opt = {
+                let map = self.per_host.lock();
+                map.get(host).map(|rl| Arc::clone(&rl.inner))
+            };
+            if let Some(arc) = arc_opt {
                 let needed = 1.0_f64;
                 loop {
                     let wait = {
@@ -280,7 +281,6 @@ impl GlobalRateLimiter {
                     }
                 }
             } else {
-                drop(map);
                 // Fallback: acquire from the temporary limiter we created
                 let needed = 1.0_f64;
                 loop {

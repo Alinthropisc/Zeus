@@ -100,7 +100,9 @@ impl Protocol for HttpFormProtocol {
         }
 
         // ok_str takes priority (explicit success indicator)
-        if let Some(ok) = ok_str && body.contains(ok) {
+        if let Some(ok) = ok_str
+            && body.contains(ok)
+        {
             return Ok(AttackResult::Success {
                 credential: cred.clone(),
                 elapsed: start.elapsed(),

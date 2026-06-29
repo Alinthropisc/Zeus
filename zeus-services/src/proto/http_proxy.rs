@@ -73,9 +73,7 @@ impl Protocol for HttpProxyProtocol {
         let status = resp.status();
         debug!("HTTP-PROXY resp: {}", status);
 
-        if status == StatusCode::PROXY_AUTHENTICATION_REQUIRED
-            || status == StatusCode::FORBIDDEN
-        {
+        if status == StatusCode::PROXY_AUTHENTICATION_REQUIRED || status == StatusCode::FORBIDDEN {
             Ok(AttackResult::Failure)
         } else {
             Ok(AttackResult::Success {

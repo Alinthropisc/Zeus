@@ -203,7 +203,7 @@ mod tests {
             };
             Box::new(buf_writer)
         };
-        let _ = raw.close().await.unwrap();
+        raw.close().await.unwrap();
     }
 
     #[tokio::test]

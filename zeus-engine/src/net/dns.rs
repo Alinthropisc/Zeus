@@ -62,10 +62,10 @@ impl DnsCache {
         // Fast path: read lock, check cache
         {
             let cache = self.cache.read();
-            if let Some(entry) = cache.get(host) {
-                if entry.expires_at > Instant::now() {
-                    return Ok(entry.addrs.clone());
-                }
+            if let Some(entry) = cache.get(host)
+                && entry.expires_at > Instant::now()
+            {
+                return Ok(entry.addrs.clone());
             }
         }
 
@@ -211,10 +211,10 @@ impl DohResolver {
         // Fast path: local cache.
         {
             let cache = self.cache.cache.read();
-            if let Some(entry) = cache.get(host) {
-                if entry.expires_at > Instant::now() {
-                    return Ok(entry.addrs.clone());
-                }
+            if let Some(entry) = cache.get(host)
+                && entry.expires_at > Instant::now()
+            {
+                return Ok(entry.addrs.clone());
             }
         }
 
@@ -306,10 +306,10 @@ impl DohResolver {
                 continue;
             }
 
-            if let Some(data) = answer.get("data").and_then(|d| d.as_str()) {
-                if let Ok(ip) = data.parse::<IpAddr>() {
-                    ips.push(ip);
-                }
+            if let Some(data) = answer.get("data").and_then(|d| d.as_str())
+                && let Ok(ip) = data.parse::<IpAddr>()
+            {
+                ips.push(ip);
             }
             if let Some(ttl) = answer.get("TTL").and_then(|t| t.as_u64()) {
                 min_ttl = min_ttl.min(ttl);

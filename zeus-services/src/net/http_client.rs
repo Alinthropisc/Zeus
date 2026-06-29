@@ -516,9 +516,7 @@ fn extract_param(header: &str, name: &str) -> Option<String> {
         let end = rest_inner.find('"')?;
         Some(rest_inner[..end].to_string())
     } else {
-        let end = rest
-            .find([',', ' '])
-            .unwrap_or(rest.len());
+        let end = rest.find([',', ' ']).unwrap_or(rest.len());
         Some(rest[..end].to_string())
     }
 }
