@@ -1,0 +1,1288 @@
+вот мой промпт с claude
+
+и так заменяем hydra на zeus и используем префикс zeus везде где можно и я предпологаю создать zeus-engine.hh .cc и zeus-core.hh .cc в core создаем интерфейс контракты а в engine реализовываем полпучается 4 или 3 файла для core думаю не нужно .cc файл а только .hh а вот в engine и .hh .cc переносим hydra-mod полностью не создаем лишние файлы добавление и так далее сделаем рабочую версию и используем Boost и покрываем тестами  Gtests вот код из Си на С++ 23 ООП Design Patterns + Programming Principles масштабируемый код docs к методам коменты внутри кода на английском обесняешь мне потом покрываем тестами thc-hydra
+
+/
+
+hydra-mod.h #ifndef _HYDRA_MOD_H
+
+#define _HYDRA_MOD_H
+
+#include "hydra.h"
+
+#ifdef __sun
+
+#include <sys/int_types.h>
+
+#elif defined(__FreeBSD__) || defined(__IBMCPP__) || defined(_AIX)
+
+#include <inttypes.h>
+
+#else
+
+#include <stdint.h>
+
+#endif
+
+extern char quiet;
+
+extern const unsigned char HYDRA_EXIT[5];
+
+extern void hydra_child_exit(int32_t code);
+
+extern void hydra_register_socket(int32_t s);
+
+extern char *hydra_get_next_pair();
+
+extern char *hydra_get_next_login();
+
+extern char *hydra_get_next_password();
+
+extern void hydra_completed_pair();
+
+extern void hydra_completed_pair_found();
+
+extern void hydra_completed_pair_skip();
+
+extern void hydra_report_found(int32_t port, char *svc, FILE *fp);
+
+extern void hydra_report_pass_found(int32_t port, char *ip, char *svc, FILE *fp);
+
+extern void hydra_report_found_host(int32_t port, char *ip, char *svc, FILE *fp);
+
+extern void hydra_report_found_host_msg(int32_t port, char *ip, char *svc, FILE *fp, char *msg);
+
+extern void hydra_report_debug(FILE *st, char *format, ...);
+
+extern int32_t hydra_connect_to_ssl(int32_t socket, char *hostname);
+
+extern int32_t hydra_connect_ssl(char *host, int32_t port, char *hostname);
+
+extern int32_t hydra_connect_tcp(char *host, int32_t port);
+
+extern int32_t hydra_connect_udp(char *host, int32_t port);
+
+extern int32_t hydra_disconnect(int32_t socket);
+
+extern int32_t hydra_data_ready(int32_t socket);
+
+extern int32_t hydra_recv(int32_t socket, char *buf, uint32_t length);
+
+extern int32_t hydra_recv_nb(int32_t socket, char *buf, uint32_t length);
+
+extern char *hydra_receive_line(int32_t socket);
+
+extern int32_t hydra_send(int32_t socket, char *buf, uint32_t size, int32_t options);
+
+extern int32_t make_to_lower(char *buf);
+
+extern unsigned char hydra_conv64(unsigned char in);
+
+extern void hydra_tobase64(unsigned char *buf, uint32_t buflen, uint32_t bufsize);
+
+extern void hydra_dump_asciihex(unsigned char *string, int32_t length);
+
+extern void hydra_set_srcport(int32_t port);
+
+extern char *hydra_address2string(char *address);
+
+extern char *hydra_address2string_beautiful(char *address);
+
+extern char *hydra_strcasestr(const char *haystack, const char *needle);
+
+extern void hydra_dump_data(unsigned char *buf, int32_t len, char *text);
+
+extern int32_t hydra_memsearch(char *haystack, int32_t hlen, char *needle, int32_t nlen);
+
+extern char *hydra_strrep(char *string, char *oldpiece, char *newpiece);
+
+#ifdef HAVE_PCRE
+
+int32_t hydra_string_match(char *str, const char *regex);
+
+#endif
+
+char *hydra_string_replace(const char *string, const char *substr, const char *replacement);
+
+int32_t debug;
+
+int32_t verbose;
+
+int32_t waittime;
+
+int32_t port;
+
+int32_t found;
+
+int32_t proxy_count;
+
+int32_t use_proxy;
+
+int32_t selected_proxy;
+
+char proxy_string_ip[MAX_PROXY_COUNT][36];
+
+int32_t proxy_string_port[MAX_PROXY_COUNT];
+
+char proxy_string_type[MAX_PROXY_COUNT][10];
+
+char *proxy_authentication[MAX_PROXY_COUNT];
+
+char *cmdlinetarget;
+
+#ifndef __APPLE__
+
+typedef int32_t BOOL;
+
+#else /* __APPLE__ */
+
+/* ensure compatibility with objc libraries */
+
+#if (TARGET_OS_IPHONE && __LP64__) || TARGET_OS_WATCH
+
+typedef bool BOOL;
+
+#else
+
+typedef signed char BOOL;
+
+#endif
+
+#endif /* __APPLE__ */
+
+#define hydra_report fprintf
+
+#endif
+
+
+его код
+// zeus-core.hh
+// -----------------------------------------------------------------------
+// Pure contract layer for the Zeus engine (formerly hydra-mod.h).
+// Contains ONLY interfaces (abstract base classes) and small value types.
+// No implementation details, no Boost dependency -> keeps the contract
+// stable and mockable (Dependency Inversion Principle).
+// -----------------------------------------------------------------------
+#pragma once
+
+#include <array>
+#include <atomic>
+#include <chrono>
+#include <cstddef>
+#include <cstdint>
+#include <mutex>
+#include <optional>
+#include <ostream>
+#include <span>
+#include <string>
+#include <string_view>
+#include <system_error>
+#include <expected>
+#include <utility>
+#include <vector>
+
+namespace zeus::core {
+
+/// Opaque handle representing a network connection owned by the engine.
+/// Using an opaque integer (Handle pattern) instead of exposing raw
+/// sockets/Boost types keeps this header free of transport dependencies.
+using SocketHandle = std::size_t;
+inline constexpr SocketHandle kInvalidSocketHandle = static_cast<SocketHandle>(-1);
+
+/// Selects the transport strategy used by INetworkConnector::connect().
+/// (Discriminator for the Strategy pattern implemented in zeus-engine.)
+enum class ConnectionType : std::uint8_t { Tcp, Udp, Ssl };
+
+/// Five-byte sentinel used for inter-process "child finished" signalling.
+/// Replacement for the legacy `HYDRA_EXIT` byte array.
+inline constexpr std::array<std::byte, 5> kZeusExit{
+    std::byte{0xFF}, std::byte{0xFF}, std::byte{0xFF}, std::byte{0xFF}, std::byte{0xFF}};
+
+/// A single proxy definition. Replaces the fixed-size
+/// `proxy_string_ip[MAX_PROXY_COUNT]` style C arrays with a value type
+/// that can be stored in a dynamically-sized container.
+struct ProxyEntry {
+    std::string ip;
+    std::uint16_t port{0};
+    std::string type;                         ///< e.g. "socks5", "http"
+    std::optional<std::string> authentication; ///< "user:pass", if any
+};
+
+// ---------------------------------------------------------------------
+// ExecutionContext
+// ---------------------------------------------------------------------
+/// Thread-safe replacement for the legacy global mutable state
+/// (`debug`, `verbose`, `waittime`, `port`, `found`, `cmdlinetarget`,
+/// `quiet`). Instances are injected into collaborators instead of being
+/// read from process-wide globals (testability, no hidden coupling).
+class ExecutionContext final {
+public:
+    void setDebug(bool value) noexcept { debug_.store(value, std::memory_order_relaxed); }
+    [[nodiscard]] bool debug() const noexcept { return debug_.load(std::memory_order_relaxed); }
+
+    void setVerbose(bool value) noexcept { verbose_.store(value, std::memory_order_relaxed); }
+    [[nodiscard]] bool verbose() const noexcept { return verbose_.load(std::memory_order_relaxed); }
+
+    void setQuiet(bool value) noexcept { quiet_.store(value, std::memory_order_relaxed); }
+    [[nodiscard]] bool quiet() const noexcept { return quiet_.load(std::memory_order_relaxed); }
+
+    void setWaitTime(std::chrono::seconds value) noexcept { waitTime_ = value; }
+    [[nodiscard]] std::chrono::seconds waitTime() const noexcept { return waitTime_; }
+
+    void setPort(std::uint16_t value) noexcept { port_.store(value, std::memory_order_relaxed); }
+    [[nodiscard]] std::uint16_t port() const noexcept { return port_.load(std::memory_order_relaxed); }
+
+    void incrementFound() noexcept { found_.fetch_add(1, std::memory_order_relaxed); }
+    [[nodiscard]] std::int32_t found() const noexcept { return found_.load(std::memory_order_relaxed); }
+
+    void setCommandLineTarget(std::string value) {
+        std::scoped_lock lock(targetMutex_);
+        cmdlineTarget_ = std::move(value);
+    }
+    [[nodiscard]] std::string commandLineTarget() const {
+        std::scoped_lock lock(targetMutex_);
+        return cmdlineTarget_;
+    }
+
+private:
+    std::atomic<bool> debug_{false};
+    std::atomic<bool> verbose_{false};
+    std::atomic<bool> quiet_{false};
+    std::chrono::seconds waitTime_{0};
+    std::atomic<std::uint16_t> port_{0};
+    std::atomic<std::int32_t> found_{0};
+    mutable std::mutex targetMutex_;
+    std::string cmdlineTarget_;
+};
+
+// ---------------------------------------------------------------------
+// INetworkConnector
+// ---------------------------------------------------------------------
+/// Contract for all network I/O (replacement for hydra_connect_tcp/udp/ssl,
+/// hydra_send, hydra_recv*, hydra_disconnect, hydra_data_ready,
+/// hydra_receive_line, hydra_register_socket).
+class INetworkConnector {
+public:
+    virtual ~INetworkConnector() = default;
+
+    /// Establishes a connection using the given strategy.
+    /// @param sniHostname optional TLS SNI hostname (used when type == Ssl).
+    [[nodiscard]] virtual std::expected<SocketHandle, std::error_code>
+    connect(std::string_view host, std::uint16_t port, ConnectionType type,
+            std::optional<std::string_view> sniHostname = std::nullopt) = 0;
+
+    /// Upgrades an already-established plain TCP handle to TLS (STARTTLS).
+    [[nodiscard]] virtual std::expected<void, std::error_code>
+    upgradeToSsl(SocketHandle handle, std::string_view sniHostname) = 0;
+
+    virtual void disconnect(SocketHandle handle) = 0;
+
+    [[nodiscard]] virtual bool
+    isDataReady(SocketHandle handle, std::chrono::milliseconds timeout) const = 0;
+
+    [[nodiscard]] virtual std::expected<std::size_t, std::error_code>
+    send(SocketHandle handle, std::span<const std::byte> data) = 0;
+
+    [[nodiscard]] virtual std::expected<std::size_t, std::error_code>
+    receive(SocketHandle handle, std::span<std::byte> buffer, bool blocking) = 0;
+
+    [[nodiscard]] virtual std::expected<std::string, std::error_code>
+    receiveLine(SocketHandle handle) = 0;
+
+    /// Registers a handle for external cleanup tracking (e.g. on SIGTERM).
+    virtual void registerSocket(SocketHandle handle) = 0;
+};
+
+// ---------------------------------------------------------------------
+// ICredentialProvider
+// ---------------------------------------------------------------------
+/// Contract for login/password iteration
+/// (hydra_get_next_pair/login/password, hydra_completed_pair*).
+class ICredentialProvider {
+public:
+    virtual ~ICredentialProvider() = default;
+
+    [[nodiscard]] virtual std::optional<std::pair<std::string, std::string>> nextPair() = 0;
+    [[nodiscard]] virtual std::optional<std::string> nextLogin() = 0;
+    [[nodiscard]] virtual std::optional<std::string> nextPassword() = 0;
+
+    virtual void completedPair() = 0;
+    virtual void completedPairFound() = 0;
+    virtual void completedPairSkip() = 0;
+};
+
+// ---------------------------------------------------------------------
+// IResultReporter
+// ---------------------------------------------------------------------
+/// Contract for reporting results (hydra_report_found*, hydra_report_debug).
+class IResultReporter {
+public:
+    virtual ~IResultReporter() = default;
+
+    virtual void reportFound(std::uint16_t port, std::string_view service, std::ostream& out) = 0;
+    virtual void reportPassFound(std::uint16_t port, std::string_view ip,
+                                  std::string_view service, std::ostream& out) = 0;
+    virtual void reportFoundHost(std::uint16_t port, std::string_view ip,
+                                  std::string_view service, std::ostream& out) = 0;
+    virtual void reportFoundHostMsg(std::uint16_t port, std::string_view ip, std::string_view service,
+                                     std::ostream& out, std::string_view message) = 0;
+    virtual void reportDebug(std::ostream& out, std::string_view message) = 0;
+};
+
+// ---------------------------------------------------------------------
+// IStringUtils
+// ---------------------------------------------------------------------
+/// Contract for byte/string helpers (make_to_lower, hydra_tobase64,
+/// hydra_strcasestr, hydra_memsearch, hydra_strrep, hydra_dump_asciihex,
+/// hydra_string_match/hydra_string_replace).
+class IStringUtils {
+public:
+    virtual ~IStringUtils() = default;
+
+    [[nodiscard]] virtual std::string toLower(std::string_view input) const = 0;
+    [[nodiscard]] virtual std::string toBase64(std::span<const std::byte> data) const = 0;
+    [[nodiscard]] virtual std::optional<std::size_t>
+    caseInsensitiveFind(std::string_view haystack, std::string_view needle) const = 0;
+    [[nodiscard]] virtual std::optional<std::size_t>
+    memorySearch(std::span<const std::byte> haystack, std::span<const std::byte> needle) const = 0;
+    [[nodiscard]] virtual std::string
+    replace(std::string_view source, std::string_view target, std::string_view replacement) const = 0;
+    [[nodiscard]] virtual std::string dumpHex(std::span<const std::byte> data) const = 0;
+    [[nodiscard]] virtual std::string
+    addressToString(std::string_view rawAddress, bool beautiful) const = 0;
+    [[nodiscard]] virtual bool
+    matchesPattern(std::string_view input, std::string_view regex) const = 0;
+    [[nodiscard]] virtual std::string
+    replacePattern(std::string_view input, std::string_view regex, std::string_view replacement) const = 0;
+};
+
+// ---------------------------------------------------------------------
+// IProxyManager
+// ---------------------------------------------------------------------
+/// Contract for proxy configuration (replacement for the fixed-size
+/// proxy_string_* arrays bound by MAX_PROXY_COUNT).
+class IProxyManager {
+public:
+    virtual ~IProxyManager() = default;
+
+    virtual void addProxy(ProxyEntry entry) = 0;
+    [[nodiscard]] virtual const std::vector<ProxyEntry>& proxies() const noexcept = 0;
+    virtual void setUseProxy(bool value) noexcept = 0;
+    [[nodiscard]] virtual bool useProxy() const noexcept = 0;
+    virtual void selectProxy(std::size_t index) = 0;
+    [[nodiscard]] virtual std::optional<ProxyEntry> selectedProxy() const = 0;
+};
+
+// ---------------------------------------------------------------------
+// IProcessController
+// ---------------------------------------------------------------------
+/// Contract for child-process lifecycle (hydra_child_exit).
+class IProcessController {
+public:
+    virtual ~IProcessController() = default;
+    [[noreturn]] virtual void exitChild(std::int32_t code) = 0;
+};
+
+}  // namespace zeus::core
+
+
+// zeus-engine.hh
+// -----------------------------------------------------------------------
+// Concrete, Boost.Asio-backed implementation of the zeus::core contracts.
+// This is the only place that knows about Boost/OS specifics
+// (Dependency Inversion: core depends on nothing, engine depends on core).
+// -----------------------------------------------------------------------
+#pragma once
+
+#include "zeus-core.hh"
+
+#include <boost/asio.hpp>
+#include <boost/asio/ssl.hpp>
+
+#include <memory>
+#include <shared_mutex>
+#include <unordered_map>
+
+namespace zeus::engine {
+
+// ---------------------------------------------------------------------
+// NetworkConnector
+// ---------------------------------------------------------------------
+/// Boost.Asio implementation of core::INetworkConnector.
+/// Internally keeps a registry: SocketHandle -> Connection (variant of
+/// tcp/udp/ssl transports). This Handle/Registry pattern keeps Boost
+/// types out of the public contract (Interface Segregation).
+class NetworkConnector final : public core::INetworkConnector {
+public:
+    explicit NetworkConnector(boost::asio::io_context& ioContext);
+    ~NetworkConnector() override;
+
+    NetworkConnector(const NetworkConnector&) = delete;
+    NetworkConnector& operator=(const NetworkConnector&) = delete;
+
+    [[nodiscard]] std::expected<core::SocketHandle, std::error_code>
+    connect(std::string_view host, std::uint16_t port, core::ConnectionType type,
+            std::optional<std::string_view> sniHostname) override;
+
+    [[nodiscard]] std::expected<void, std::error_code>
+    upgradeToSsl(core::SocketHandle handle, std::string_view sniHostname) override;
+
+    void disconnect(core::SocketHandle handle) override;
+
+    [[nodiscard]] bool
+    isDataReady(core::SocketHandle handle, std::chrono::milliseconds timeout) const override;
+
+    [[nodiscard]] std::expected<std::size_t, std::error_code>
+    send(core::SocketHandle handle, std::span<const std::byte> data) override;
+
+    [[nodiscard]] std::expected<std::size_t, std::error_code>
+    receive(core::SocketHandle handle, std::span<std::byte> buffer, bool blocking) override;
+
+    [[nodiscard]] std::expected<std::string, std::error_code>
+    receiveLine(core::SocketHandle handle) override;
+
+    void registerSocket(core::SocketHandle handle) override;
+
+private:
+    struct Connection;  ///< Implementation detail (variant of transports).
+
+    boost::asio::io_context& ioContext_;
+    boost::asio::ssl::context sslContext_;
+    mutable std::shared_mutex mutex_;
+    std::unordered_map<core::SocketHandle, std::unique_ptr<Connection>> connections_;
+    std::atomic<core::SocketHandle> nextHandle_{0};
+
+    [[nodiscard]] Connection* find(core::SocketHandle handle) const;
+};
+
+// ---------------------------------------------------------------------
+// CredentialProvider
+// ---------------------------------------------------------------------
+/// Thread-safe login x password cartesian iterator.
+class CredentialProvider final : public core::ICredentialProvider {
+public:
+    CredentialProvider(std::vector<std::string> logins, std::vector<std::string> passwords);
+
+    [[nodiscard]] std::optional<std::pair<std::string, std::string>> nextPair() override;
+    [[nodiscard]] std::optional<std::string> nextLogin() override;
+    [[nodiscard]] std::optional<std::string> nextPassword() override;
+
+    void completedPair() override;
+    void completedPairFound() override;
+    void completedPairSkip() override;
+
+    [[nodiscard]] std::size_t attempts() const noexcept { return attempts_.load(); }
+    [[nodiscard]] std::size_t foundCount() const noexcept { return found_.load(); }
+    [[nodiscard]] std::size_t skippedCount() const noexcept { return skipped_.load(); }
+
+private:
+    mutable std::mutex mutex_;
+    std::vector<std::string> logins_;
+    std::vector<std::string> passwords_;
+    std::size_t loginIndex_{0};
+    std::size_t passwordIndex_{0};
+    std::atomic<std::size_t> attempts_{0};
+    std::atomic<std::size_t> found_{0};
+    std::atomic<std::size_t> skipped_{0};
+};
+
+// ---------------------------------------------------------------------
+// ResultReporter
+// ---------------------------------------------------------------------
+class ResultReporter final : public core::IResultReporter {
+public:
+    explicit ResultReporter(std::shared_ptr<core::ExecutionContext> context);
+
+    void reportFound(std::uint16_t port, std::string_view service, std::ostream& out) override;
+    void reportPassFound(std::uint16_t port, std::string_view ip,
+                          std::string_view service, std::ostream& out) override;
+    void reportFoundHost(std::uint16_t port, std::string_view ip,
+                          std::string_view service, std::ostream& out) override;
+    void reportFoundHostMsg(std::uint16_t port, std::string_view ip, std::string_view service,
+                             std::ostream& out, std::string_view message) override;
+    void reportDebug(std::ostream& out, std::string_view message) override;
+
+private:
+    std::shared_ptr<core::ExecutionContext> context_;
+    std::mutex writeMutex_;
+};
+
+// ---------------------------------------------------------------------
+// StringUtils
+// ---------------------------------------------------------------------
+class StringUtils final : public core::IStringUtils {
+public:
+    [[nodiscard]] std::string toLower(std::string_view input) const override;
+    [[nodiscard]] std::string toBase64(std::span<const std::byte> data) const override;
+    [[nodiscard]] std::optional<std::size_t>
+    caseInsensitiveFind(std::string_view haystack, std::string_view needle) const override;
+    [[nodiscard]] std::optional<std::size_t>
+    memorySearch(std::span<const std::byte> haystack, std::span<const std::byte> needle) const override;
+    [[nodiscard]] std::string
+    replace(std::string_view source, std::string_view target, std::string_view replacement) const override;
+    [[nodiscard]] std::string dumpHex(std::span<const std::byte> data) const override;
+    [[nodiscard]] std::string addressToString(std::string_view rawAddress, bool beautiful) const override;
+    [[nodiscard]] bool matchesPattern(std::string_view input, std::string_view regex) const override;
+    [[nodiscard]] std::string
+    replacePattern(std::string_view input, std::string_view regex, std::string_view replacement) const override;
+};
+
+// ---------------------------------------------------------------------
+// ProxyManager
+// ---------------------------------------------------------------------
+class ProxyManager final : public core::IProxyManager {
+public:
+    void addProxy(core::ProxyEntry entry) override;
+    [[nodiscard]] const std::vector<core::ProxyEntry>& proxies() const noexcept override;
+    void setUseProxy(bool value) noexcept override;
+    [[nodiscard]] bool useProxy() const noexcept override;
+    void selectProxy(std::size_t index) override;
+    [[nodiscard]] std::optional<core::ProxyEntry> selectedProxy() const override;
+
+private:
+    mutable std::shared_mutex mutex_;
+    std::vector<core::ProxyEntry> proxies_;
+    std::atomic<bool> useProxy_{false};
+    std::optional<std::size_t> selectedIndex_;
+};
+
+// ---------------------------------------------------------------------
+// ProcessController
+// ---------------------------------------------------------------------
+class ProcessController final : public core::IProcessController {
+public:
+    explicit ProcessController(std::shared_ptr<core::INetworkConnector> connector);
+    [[noreturn]] void exitChild(std::int32_t code) override;
+
+private:
+    std::shared_ptr<core::INetworkConnector> connector_;
+};
+
+// ---------------------------------------------------------------------
+// NetworkConnectorFactory (Factory Method)
+// ---------------------------------------------------------------------
+class NetworkConnectorFactory final {
+public:
+    [[nodiscard]] static std::shared_ptr<core::INetworkConnector>
+    create(boost::asio::io_context& ioContext);
+};
+
+// ---------------------------------------------------------------------
+// Engine (Facade)
+// ---------------------------------------------------------------------
+/// Aggregates all subsystems behind one entry point. Depends only on
+/// abstractions (core::I*), so it can be fully mocked in tests
+/// (Dependency Inversion Principle).
+class Engine final {
+public:
+    struct Dependencies {
+        std::shared_ptr<core::ExecutionContext> context;
+        std::shared_ptr<core::INetworkConnector> connector;
+        std::shared_ptr<core::ICredentialProvider> credentials;
+        std::shared_ptr<core::IResultReporter> reporter;
+        std::shared_ptr<core::IStringUtils> stringUtils;
+        std::shared_ptr<core::IProxyManager> proxyManager;
+        std::shared_ptr<core::IProcessController> processController;
+    };
+
+    explicit Engine(Dependencies dependencies);
+
+    [[nodiscard]] core::ExecutionContext& context() noexcept { return *deps_.context; }
+    [[nodiscard]] core::INetworkConnector& network() noexcept { return *deps_.connector; }
+    [[nodiscard]] core::ICredentialProvider& credentials() noexcept { return *deps_.credentials; }
+    [[nodiscard]] core::IResultReporter& reporter() noexcept { return *deps_.reporter; }
+    [[nodiscard]] core::IStringUtils& strings() noexcept { return *deps_.stringUtils; }
+    [[nodiscard]] core::IProxyManager& proxies() noexcept { return *deps_.proxyManager; }
+    [[nodiscard]] core::IProcessController& process() noexcept { return *deps_.processController; }
+
+private:
+    Dependencies deps_;
+};
+
+/// Builds a fully-wired Engine with default production implementations.
+class EngineFactory final {
+public:
+    [[nodiscard]] static std::unique_ptr<Engine>
+    createDefault(boost::asio::io_context& ioContext,
+                  std::vector<std::string> logins,
+                  std::vector<std::string> passwords);
+};
+
+}  // namespace zeus::engine
+
+
+// zeus-engine.cc
+#include "zeus-engine.hh"
+
+#include <boost/algorithm/string.hpp>
+#include <boost/archive/iterators/base64_from_binary.hpp>
+#include <boost/archive/iterators/transform_width.hpp>
+#include <boost/regex.hpp>
+
+#include <algorithm>
+#include <cstdlib>
+#include <istream>
+#include <variant>
+
+namespace zeus::engine {
+
+using core::ConnectionType;
+using core::ProxyEntry;
+using core::SocketHandle;
+
+// =======================================================================
+// NetworkConnector
+// =======================================================================
+
+/// Internal per-connection state: one of TCP socket / UDP socket / TLS
+/// stream, plus a read buffer used by receiveLine().
+struct NetworkConnector::Connection {
+    using SslStream = boost::asio::ssl::stream<boost::asio::ip::tcp::socket>;
+    std::variant<boost::asio::ip::tcp::socket, boost::asio::ip::udp::socket, SslStream> transport;
+    boost::asio::streambuf readBuffer;
+
+    explicit Connection(boost::asio::ip::tcp::socket socket) : transport(std::move(socket)) {}
+    explicit Connection(boost::asio::ip::udp::socket socket) : transport(std::move(socket)) {}
+    explicit Connection(SslStream stream) : transport(std::move(stream)) {}
+};
+
+NetworkConnector::NetworkConnector(boost::asio::io_context& ioContext)
+    : ioContext_(ioContext), sslContext_(boost::asio::ssl::context::tls_client) {
+    sslContext_.set_default_verify_paths();
+}
+
+NetworkConnector::~NetworkConnector() = default;
+
+std::expected<SocketHandle, std::error_code> NetworkConnector::connect(
+    std::string_view host, std::uint16_t port, ConnectionType type,
+    std::optional<std::string_view> sniHostname) {
+    namespace asio = boost::asio;
+    using tcp = asio::ip::tcp;
+    using udp = asio::ip::udp;
+
+    boost::system::error_code ec;
+    std::unique_ptr<Connection> connection;
+
+    try {
+        switch (type) {
+            case ConnectionType::Tcp: {
+                tcp::socket socket(ioContext_);
+                tcp::resolver resolver(ioContext_);
+                auto endpoints = resolver.resolve(std::string(host), std::to_string(port), ec);
+                if (ec) return std::unexpected(ec);
+                asio::connect(socket, endpoints, ec);
+                if (ec) return std::unexpected(ec);
+                connection = std::make_unique<Connection>(std::move(socket));
+                break;
+            }
+            case ConnectionType::Udp: {
+                udp::socket socket(ioContext_);
+                udp::resolver resolver(ioContext_);
+                auto endpoints = resolver.resolve(std::string(host), std::to_string(port), ec);
+                if (ec) return std::unexpected(ec);
+                socket.open(endpoints->endpoint().protocol(), ec);
+                if (!ec) socket.connect(*endpoints, ec);
+                if (ec) return std::unexpected(ec);
+                connection = std::make_unique<Connection>(std::move(socket));
+                break;
+            }
+            case ConnectionType::Ssl: {
+                tcp::socket rawSocket(ioContext_);
+                tcp::resolver resolver(ioContext_);
+                auto endpoints = resolver.resolve(std::string(host), std::to_string(port), ec);
+                if (ec) return std::unexpected(ec);
+                asio::connect(rawSocket, endpoints, ec);
+                if (ec) return std::unexpected(ec);
+
+                Connection::SslStream sslStream(std::move(rawSocket), sslContext_);
+                if (sniHostname) {
+                    ::SSL_set_tlsext_host_name(sslStream.native_handle(), std::string(*sniHostname).c_str());
+                }
+                sslStream.handshake(asio::ssl::stream_base::client, ec);
+                if (ec) return std::unexpected(ec);
+                connection = std::make_unique<Connection>(std::move(sslStream));
+                break;
+            }
+        }
+    } catch (const std::exception&) {
+        return std::unexpected(std::make_error_code(std::errc::connection_aborted));
+    }
+
+    std::unique_lock lock(mutex_);
+    const auto handle = nextHandle_.fetch_add(1, std::memory_order_relaxed);
+    connections_.emplace(handle, std::move(connection));
+    return handle;
+}
+
+std::expected<void, std::error_code> NetworkConnector::upgradeToSsl(
+    SocketHandle handle, std::string_view sniHostname) {
+    std::unique_lock lock(mutex_);
+    auto it = connections_.find(handle);
+    if (it == connections_.end())
+        return std::unexpected(std::make_error_code(std::errc::bad_file_descriptor));
+
+    auto* tcpSocket = std::get_if<boost::asio::ip::tcp::socket>(&it->second->transport);
+    if (!tcpSocket)
+        return std::unexpected(std::make_error_code(std::errc::not_supported));
+
+    Connection::SslStream sslStream(std::move(*tcpSocket), sslContext_);
+    ::SSL_set_tlsext_host_name(sslStream.native_handle(), std::string(sniHostname).c_str());
+
+    boost::system::error_code ec;
+    sslStream.handshake(boost::asio::ssl::stream_base::client, ec);
+    if (ec) return std::unexpected(ec);
+
+    it->second->transport = std::move(sslStream);
+    return {};
+}
+
+void NetworkConnector::disconnect(SocketHandle handle) {
+    std::unique_lock lock(mutex_);
+    connections_.erase(handle);
+}
+
+NetworkConnector::Connection* NetworkConnector::find(SocketHandle handle) const {
+    std::shared_lock lock(mutex_);
+    auto it = connections_.find(handle);
+    return it == connections_.end() ? nullptr : it->second.get();
+}
+
+bool NetworkConnector::isDataReady(SocketHandle handle, std::chrono::milliseconds) const {
+    auto* connection = find(handle);
+    if (!connection) return false;
+
+    return std::visit(
+        [](auto& transport) -> bool {
+            using T = std::decay_t<decltype(transport)>;
+            if constexpr (std::is_same_v<T, boost::asio::ip::tcp::socket> ||
+                          std::is_same_v<T, boost::asio::ip::udp::socket>) {
+                return transport.available() > 0;
+            } else {
+                return transport.next_layer().available() > 0;
+            }
+        },
+        connection->transport);
+}
+
+std::expected<std::size_t, std::error_code> NetworkConnector::send(
+    SocketHandle handle, std::span<const std::byte> data) {
+    auto* connection = find(handle);
+    if (!connection) return std::unexpected(std::make_error_code(std::errc::bad_file_descriptor));
+
+    boost::system::error_code ec;
+    std::size_t written = 0;
+    std::visit(
+        [&](auto& transport) {
+            written = boost::asio::write(transport, boost::asio::buffer(data.data(), data.size()), ec);
+        },
+        connection->transport);
+
+    if (ec) return std::unexpected(ec);
+    return written;
+}
+
+std::expected<std::size_t, std::error_code> NetworkConnector::receive(
+    SocketHandle handle, std::span<std::byte> buffer, bool blocking) {
+    auto* connection = find(handle);
+    if (!connection) return std::unexpected(std::make_error_code(std::errc::bad_file_descriptor));
+
+    boost::system::error_code ec;
+    std::size_t bytesRead = 0;
+    std::visit(
+        [&](auto& transport) {
+            using T = std::decay_t<decltype(transport)>;
+            if (!blocking) {
+                boost::asio::ip::tcp::socket* raw = nullptr;
+                if constexpr (std::is_same_v<T, boost::asio::ip::tcp::socket>) raw = &transport;
+                else if constexpr (!std::is_same_v<T, boost::asio::ip::udp::socket>) raw = &transport.next_layer();
+                if (raw && raw->available() == 0) {
+                    ec = boost::asio::error::would_block;
+                    return;
+                }
+            }
+            bytesRead = transport.read_some(boost::asio::buffer(buffer.data(), buffer.size()), ec);
+        },
+        connection->transport);
+
+    if (ec) return std::unexpected(ec);
+    return bytesRead;
+}
+
+std::expected<std::string, std::error_code> NetworkConnector::receiveLine(SocketHandle handle) {
+    auto* connection = find(handle);
+    if (!connection) return std::unexpected(std::make_error_code(std::errc::bad_file_descriptor));
+
+    boost::system::error_code ec;
+    std::visit(
+        [&](auto& transport) {
+            boost::asio::read_until(transport, connection->readBuffer, '\n', ec);
+        },
+        connection->transport);
+
+    if (ec && ec != boost::asio::error::eof) return std::unexpected(ec);
+
+    std::istream stream(&connection->readBuffer);
+    std::string line;
+    std::getline(stream, line);
+    if (!line.empty() && line.back() == '\r') line.pop_back();
+    return line;
+}
+
+void NetworkConnector::registerSocket(SocketHandle) {
+    // Reserved hook for future signal-based cleanup (e.g. SIGTERM handler
+    // that iterates all registered handles and disconnects them).
+}
+
+// =======================================================================
+// CredentialProvider
+// =======================================================================
+
+CredentialProvider::CredentialProvider(std::vector<std::string> logins, std::vector<std::string> passwords)
+    : logins_(std::move(logins)), passwords_(std::move(passwords)) {}
+
+std::optional<std::pair<std::string, std::string>> CredentialProvider::nextPair() {
+    std::scoped_lock lock(mutex_);
+    if (loginIndex_ >= logins_.size()) return std::nullopt;
+
+    auto login = logins_[loginIndex_];
+    auto password = passwordIndex_ < passwords_.size() ? passwords_[passwordIndex_] : std::string{};
+
+    if (++passwordIndex_ >= passwords_.size()) {
+        passwordIndex_ = 0;
+        ++loginIndex_;
+    }
+    return std::make_pair(std::move(login), std::move(password));
+}
+
+std::optional<std::string> CredentialProvider::nextLogin() {
+    std::scoped_lock lock(mutex_);
+    if (loginIndex_ >= logins_.size()) return std::nullopt;
+    return logins_[loginIndex_++];
+}
+
+std::optional<std::string> CredentialProvider::nextPassword() {
+    std::scoped_lock lock(mutex_);
+    if (passwordIndex_ >= passwords_.size()) return std::nullopt;
+    return passwords_[passwordIndex_++];
+}
+
+void CredentialProvider::completedPair() { attempts_.fetch_add(1, std::memory_order_relaxed); }
+
+void CredentialProvider::completedPairFound() {
+    attempts_.fetch_add(1, std::memory_order_relaxed);
+    found_.fetch_add(1, std::memory_order_relaxed);
+}
+
+void CredentialProvider::completedPairSkip() { skipped_.fetch_add(1, std::memory_order_relaxed); }
+
+// =======================================================================
+// ResultReporter
+// =======================================================================
+
+ResultReporter::ResultReporter(std::shared_ptr<core::ExecutionContext> context)
+    : context_(std::move(context)) {}
+
+void ResultReporter::reportFound(std::uint16_t port, std::string_view service, std::ostream& out) {
+    std::scoped_lock lock(writeMutex_);
+    out << "[" << port << "][" << service << "] target found\n";
+    context_->incrementFound();
+}
+
+void ResultReporter::reportPassFound(std::uint16_t port, std::string_view ip,
+                                      std::string_view service, std::ostream& out) {
+    std::scoped_lock lock(writeMutex_);
+    out << "[" << port << "][" << service << "] host: " << ip << " password found\n";
+    context_->incrementFound();
+}
+
+void ResultReporter::reportFoundHost(std::uint16_t port, std::string_view ip,
+                                      std::string_view service, std::ostream& out) {
+    std::scoped_lock lock(writeMutex_);
+    out << "[" << port << "][" << service << "] host: " << ip << "\n";
+}
+
+void ResultReporter::reportFoundHostMsg(std::uint16_t port, std::string_view ip, std::string_view service,
+                                         std::ostream& out, std::string_view message) {
+    std::scoped_lock lock(writeMutex_);
+    out << "[" << port << "][" << service << "] host: " << ip << "   " << message << "\n";
+}
+
+void ResultReporter::reportDebug(std::ostream& out, std::string_view message) {
+    if (!context_->debug()) return;
+    std::scoped_lock lock(writeMutex_);
+    out << "[DEBUG] " << message << "\n";
+}
+
+// =======================================================================
+// StringUtils
+// =======================================================================
+
+std::string StringUtils::toLower(std::string_view input) const {
+    std::string result(input);
+    boost::algorithm::to_lower(result);
+    return result;
+}
+
+std::string StringUtils::toBase64(std::span<const std::byte> data) const {
+    using namespace boost::archive::iterators;
+    using Base64Iterator = base64_from_binary<transform_width<const unsigned char*, 6, 8>>;
+
+    const auto* begin = reinterpret_cast<const unsigned char*>(data.data());
+    std::string encoded(Base64Iterator(begin), Base64Iterator(begin + data.size()));
+    encoded.append((3 - data.size() % 3) % 3, '=');
+    return encoded;
+}
+
+std::optional<std::size_t> StringUtils::caseInsensitiveFind(
+    std::string_view haystack, std::string_view needle) const {
+    if (needle.empty()) return 0;
+    auto it = boost::ifind_first(haystack, needle);
+    if (it.begin() == haystack.end()) return std::nullopt;
+    return static_cast<std::size_t>(std::distance(haystack.begin(), it.begin()));
+}
+
+std::optional<std::size_t> StringUtils::memorySearch(
+    std::span<const std::byte> haystack, std::span<const std::byte> needle) const {
+    if (needle.empty() || needle.size() > haystack.size()) return std::nullopt;
+    auto it = std::search(haystack.begin(), haystack.end(), needle.begin(), needle.end());
+    if (it == haystack.end()) return std::nullopt;
+    return static_cast<std::size_t>(std::distance(haystack.begin(), it));
+}
+
+std::string StringUtils::replace(
+    std::string_view source, std::string_view target, std::string_view replacement) const {
+    std::string result(source);
+    if (!target.empty()) boost::replace_all(result, target, replacement);
+    return result;
+}
+
+std::string StringUtils::dumpHex(std::span<const std::byte> data) const {
+    static constexpr char kHexDigits[] = "0123456789ABCDEF";
+    std::string result;
+    result.reserve(data.size() * 2);
+    for (auto byte : data) {
+        auto value = std::to_integer<unsigned char>(byte);
+        result.push_back(kHexDigits[value >> 4]);
+        result.push_back(kHexDigits[value & 0x0F]);
+    }
+    return result;
+}
+
+std::string StringUtils::addressToString(std::string_view rawAddress, bool /*beautiful*/) const {
+    try {
+        return boost::asio::ip::make_address(std::string(rawAddress)).to_string();
+    } catch (const std::exception&) {
+        return std::string(rawAddress);
+    }
+}
+
+bool StringUtils::matchesPattern(std::string_view input, std::string_view regex) const {
+    try {
+        return boost::regex_search(input.begin(), input.end(), boost::regex(std::string(regex)));
+    } catch (const boost::regex_error&) {
+        return false;
+    }
+}
+
+std::string StringUtils::replacePattern(
+    std::string_view input, std::string_view regex, std::string_view replacement) const {
+    try {
+        boost::regex pattern(std::string(regex));
+        return boost::regex_replace(std::string(input), pattern, std::string(replacement));
+    } catch (const boost::regex_error&) {
+        return std::string(input);
+    }
+}
+
+// =======================================================================
+// ProxyManager
+// =======================================================================
+
+void ProxyManager::addProxy(ProxyEntry entry) {
+    std::unique_lock lock(mutex_);
+    proxies_.push_back(std::move(entry));
+}
+
+const std::vector<ProxyEntry>& ProxyManager::proxies() const noexcept { return proxies_; }
+
+void ProxyManager::setUseProxy(bool value) noexcept { useProxy_.store(value, std::memory_order_relaxed); }
+bool ProxyManager::useProxy() const noexcept { return useProxy_.load(std::memory_order_relaxed); }
+
+void ProxyManager::selectProxy(std::size_t index) {
+    std::unique_lock lock(mutex_);
+    if (index < proxies_.size()) selectedIndex_ = index;
+}
+
+std::optional<ProxyEntry> ProxyManager::selectedProxy() const {
+    std::shared_lock lock(mutex_);
+    if (!selectedIndex_ || *selectedIndex_ >= proxies_.size()) return std::nullopt;
+    return proxies_[*selectedIndex_];
+}
+
+// =======================================================================
+// ProcessController
+// =======================================================================
+
+ProcessController::ProcessController(std::shared_ptr<core::INetworkConnector> connector)
+    : connector_(std::move(connector)) {}
+
+void ProcessController::exitChild(std::int32_t code) {
+    // In the legacy implementation this wrote HYDRA_EXIT into a pipe and
+    // then terminated. Socket cleanup is delegated to NetworkConnector's
+    // RAII destructors; we only need to terminate the process here.
+    std::quick_exit(code);
+}
+
+// =======================================================================
+// Factories
+// =======================================================================
+
+std::shared_ptr<core::INetworkConnector> NetworkConnectorFactory::create(
+    boost::asio::io_context& ioContext) {
+    return std::make_shared<NetworkConnector>(ioContext);
+}
+
+Engine::Engine(Dependencies dependencies) : deps_(std::move(dependencies)) {}
+
+std::unique_ptr<Engine> EngineFactory::createDefault(
+    boost::asio::io_context& ioContext, std::vector<std::string> logins, std::vector<std::string> passwords) {
+    auto context = std::make_shared<core::ExecutionContext>();
+    auto connector = NetworkConnectorFactory::create(ioContext);
+
+    Engine::Dependencies deps{
+        .context = context,
+        .connector = connector,
+        .credentials = std::make_shared<CredentialProvider>(std::move(logins), std::move(passwords)),
+        .reporter = std::make_shared<ResultReporter>(context),
+        .stringUtils = std::make_shared<StringUtils>(),
+        .proxyManager = std::make_shared<ProxyManager>(),
+        .processController = std::make_shared<ProcessController>(connector),
+    };
+
+    return std::make_unique<Engine>(std::move(deps));
+}
+
+}  // namespace zeus::engine
+
+// tests/zeus_engine_test.cc
+#include "zeus-core.hh"
+#include "zeus-engine.hh"
+
+#include <gmock/gmock.h>
+#include <gtest/gtest.h>
+
+#include <sstream>
+#include <thread>
+
+using namespace zeus::core;
+using namespace zeus::engine;
+
+// ---- ExecutionContext ----
+
+TEST(ExecutionContextTest, DefaultsAreSane) {
+    ExecutionContext ctx;
+    EXPECT_FALSE(ctx.debug());
+    EXPECT_EQ(ctx.found(), 0);
+}
+
+TEST(ExecutionContextTest, SettersAndGettersWork) {
+    ExecutionContext ctx;
+    ctx.setDebug(true);
+    ctx.setPort(4444);
+    ctx.incrementFound();
+    ctx.incrementFound();
+    ctx.setCommandLineTarget("10.0.0.1");
+
+    EXPECT_TRUE(ctx.debug());
+    EXPECT_EQ(ctx.port(), 4444);
+    EXPECT_EQ(ctx.found(), 2);
+    EXPECT_EQ(ctx.commandLineTarget(), "10.0.0.1");
+}
+
+// ---- StringUtils ----
+
+TEST(StringUtilsTest, ToLowerConvertsCorrectly) {
+    StringUtils utils;
+    EXPECT_EQ(utils.toLower("HeLLo World"), "hello world");
+}
+
+TEST(StringUtilsTest, Base64EncodesKnownValue) {
+    StringUtils utils;
+    std::string input = "hydra";
+    auto bytes = std::as_bytes(std::span(input));
+    EXPECT_EQ(utils.toBase64(bytes), "aHlkcmE=");
+}
+
+TEST(StringUtilsTest, CaseInsensitiveFindLocatesSubstring) {
+    StringUtils utils;
+    auto pos = utils.caseInsensitiveFind("Welcome to ZEUS", "zeus");
+    ASSERT_TRUE(pos.has_value());
+    EXPECT_EQ(*pos, 11u);
+}
+
+TEST(StringUtilsTest, MemorySearchFindsBinaryPattern) {
+    StringUtils utils;
+    std::vector<std::byte> haystack{std::byte{'a'}, std::byte{'b'}, std::byte{0x00}, std::byte{0x01}, std::byte{0x02}};
+    std::vector<std::byte> needle{std::byte{0x01}, std::byte{0x02}};
+
+    auto pos = utils.memorySearch(haystack, needle);
+    ASSERT_TRUE(pos.has_value());
+    EXPECT_EQ(*pos, 3u);
+}
+
+TEST(StringUtilsTest, ReplaceSubstitutesAllOccurrences) {
+    StringUtils utils;
+    EXPECT_EQ(utils.replace("foo-bar-foo", "foo", "baz"), "baz-bar-baz");
+}
+
+TEST(StringUtilsTest, DumpHexProducesUppercaseHex) {
+    StringUtils utils;
+    std::array<std::byte, 2> data{std::byte{0xDE}, std::byte{0xAD}};
+    EXPECT_EQ(utils.dumpHex(data), "DEAD");
+}
+
+TEST(StringUtilsTest, RegexHelpersWork) {
+    StringUtils utils;
+    EXPECT_TRUE(utils.matchesPattern("HTTP/1.1 200 OK", R"(\d{3})"));
+    EXPECT_EQ(utils.replacePattern("HTTP/1.1 200 OK", R"(\d{3})", "XXX"), "HTTP/1.1 XXX OK");
+}
+
+// ---- CredentialProvider ----
+
+TEST(CredentialProviderTest, NextPairCyclesThroughPasswords) {
+    CredentialProvider provider({"admin", "root"}, {"123", "456"});
+
+    auto p1 = provider.nextPair();
+    ASSERT_TRUE(p1);
+    EXPECT_EQ(p1->first, "admin");
+    EXPECT_EQ(p1->second, "123");
+
+    auto p2 = provider.nextPair();
+    ASSERT_TRUE(p2);
+    EXPECT_EQ(p2->second, "456");
+
+    auto p3 = provider.nextPair();
+    ASSERT_TRUE(p3);
+    EXPECT_EQ(p3->first, "root");
+}
+
+TEST(CredentialProviderTest, ExhaustionReturnsNullopt) {
+    CredentialProvider provider({"admin"}, {"123"});
+    provider.nextPair();
+    EXPECT_FALSE(provider.nextPair().has_value());
+}
+
+TEST(CredentialProviderTest, CompletionCountersUpdate) {
+    CredentialProvider provider({"admin"}, {"123"});
+    provider.completedPair();
+    provider.completedPairFound();
+    provider.completedPairSkip();
+
+    EXPECT_EQ(provider.attempts(), 2u);
+    EXPECT_EQ(provider.foundCount(), 1u);
+    EXPECT_EQ(provider.skippedCount(), 1u);
+}
+
+// ---- ProxyManager ----
+
+TEST(ProxyManagerTest, AddAndSelectProxy) {
+    ProxyManager manager;
+    manager.addProxy({"127.0.0.1", 1080, "socks5", std::nullopt});
+    manager.addProxy({"127.0.0.2", 8080, "http", std::string("user:pass")});
+
+    manager.setUseProxy(true);
+    manager.selectProxy(1);
+
+    EXPECT_TRUE(manager.useProxy());
+    ASSERT_EQ(manager.proxies().size(), 2u);
+
+    auto selected = manager.selectedProxy();
+    ASSERT_TRUE(selected.has_value());
+    EXPECT_EQ(selected->ip, "127.0.0.2");
+    EXPECT_EQ(selected->authentication.value(), "user:pass");
+}
+
+// ---- ResultReporter ----
+
+TEST(ResultReporterTest, ReportFoundIncrementsContextAndWrites) {
+    auto ctx = std::make_shared<ExecutionContext>();
+    ResultReporter reporter(ctx);
+    std::ostringstream out;
+
+    reporter.reportFound(21, "ftp", out);
+
+    EXPECT_EQ(ctx->found(), 1);
+    EXPECT_NE(out.str().find("ftp"), std::string::npos);
+}
+
+TEST(ResultReporterTest, DebugMessagesAreSuppressedUnlessEnabled) {
+    auto ctx = std::make_shared<ExecutionContext>();
+    ResultReporter reporter(ctx);
+    std::ostringstream out;
+
+    reporter.reportDebug(out, "hidden");
+    EXPECT_TRUE(out.str().empty());
+
+    ctx->setDebug(true);
+    reporter.reportDebug(out, "visible");
+    EXPECT_NE(out.str().find("visible"), std::string::npos);
+}
+
+// ---- Mock connector for dependency-injected components ----
+
+class MockNetworkConnector : public INetworkConnector {
+public:
+    MOCK_METHOD((std::expected<SocketHandle, std::error_code>), connect,
+                (std::string_view, std::uint16_t, ConnectionType, std::optional<std::string_view>), (override));
+    MOCK_METHOD((std::expected<void, std::error_code>), upgradeToSsl, (SocketHandle, std::string_view), (override));
+    MOCK_METHOD(void, disconnect, (SocketHandle), (override));
+    MOCK_METHOD(bool, isDataReady, (SocketHandle, std::chrono::milliseconds), (const, override));
+    MOCK_METHOD((std::expected<std::size_t, std::error_code>), send,
+                (SocketHandle, std::span<const std::byte>), (override));
+    MOCK_METHOD((std::expected<std::size_t, std::error_code>), receive,
+                (SocketHandle, std::span<std::byte>, bool), (override));
+    MOCK_METHOD((std::expected<std::string, std::error_code>), receiveLine, (SocketHandle), (override));
+    MOCK_METHOD(void, registerSocket, (SocketHandle), (override));
+};
+
+TEST(ProcessControllerTest, ExitChildTerminatesWithGivenCode) {
+    auto mockConnector = std::make_shared<MockNetworkConnector>();
+    ProcessController controller(mockConnector);
+    EXPECT_EXIT(controller.exitChild(7), ::testing::ExitedWithCode(7), "");
+}
+
+// ---- Integration test: real loopback TCP round-trip ----
+
+TEST(NetworkConnectorIntegrationTest, TcpLoopbackEchoWorks) {
+    namespace asio = boost::asio;
+    asio::io_context io;
+    asio::ip::tcp::acceptor acceptor(io, asio::ip::tcp::endpoint(asio::ip::tcp::v4(), 0));
+    const auto boundPort = acceptor.local_endpoint().port();
+
+    std::thread server([&] {
+        asio::ip::tcp::socket socket(io);
+        acceptor.accept(socket);
+        std::array<char, 64> buffer{};
+        boost::system::error_code ec;
+        std::size_t length = socket.read_some(asio::buffer(buffer), ec);
+        if (!ec) asio::write(socket, asio::buffer(buffer, length), ec);
+    });
+
+    NetworkConnector connector(io);
+    auto handle = connector.connect("127.0.0.1", boundPort, ConnectionType::Tcp, std::nullopt);
+    ASSERT_TRUE(handle.has_value());
+
+    std::string message = "ping";
+    auto sent = connector.send(*handle, std::as_bytes(std::span(message)));
+    ASSERT_TRUE(sent.has_value());
+
+    std::array<std::byte, 64> readBuffer{};
+    auto received = connector.receive(*handle, readBuffer, true);
+    ASSERT_TRUE(received.has_value());
+
+    std::string reply(reinterpret_cast<const char*>(readBuffer.data()), *received);
+    EXPECT_EQ(reply, "ping");
+
+    connector.disconnect(*handle);
+    server.join();
+}

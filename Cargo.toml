@@ -1,0 +1,63 @@
+[workspace]
+members = [
+    "zeus-core",
+    "zeus-engine", 
+    "zeus-macros", 
+    "zeus-services",
+    "zeus-attack",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+repository = "https://github.com/Alinthropisc/Zeus"
+keywords = ["security", "pentesting", "network", "authentication", "research"]
+categories = ["network-programming", "command-line-utilities"]
+
+[workspace.dependencies]
+tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.13", features = ["rustls-tls", "json"], default-features = false }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "fmt"] }
+anyhow = "1"
+thiserror = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+config = { version = "0.15", features = ["toml"] }
+async-trait = "0.1"
+sha1 = "0.11"
+sha2 = "0.11"
+md-5 = "0.11"
+md4 = "0.11"
+hmac = "0.13"
+hex = "0.4"
+base64 = "0.23"
+clap = { version = "4", features = ["derive", "env"] }
+ratatui = "0.30"
+crossterm = "0.29"
+futures = "0.3"
+tokio-stream = "0.1"
+uuid = { version = "1", features = ["v4", "serde"] }
+bytes = "1"
+parking_lot = "0.12"
+dashmap = "6"
+rand = "0.10"
+chrono = { version = "0.4", features = ["serde"] }
+tonic = "0.14"
+prost = "0.14"
+tokio-rustls = "0.26"
+rustls = { version = "0.23", features = ["ring"] }
+webpki-roots = "1"
+
+[package]
+name = "zeus"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "zeus"
+path = "src/main.rs"
+
+[dependencies]
+ratatui = "0.30.2"

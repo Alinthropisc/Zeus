@@ -1,0 +1,36 @@
+#pragma once
+
+#define ZEUS_VERSION_MAJOR @PROJECT_VERSION_MAJOR@
+#define ZEUS_VERSION_MINOR @PROJECT_VERSION_MINOR@
+#define ZEUS_VERSION_PATCH @PROJECT_VERSION_PATCH@
+#define ZEUS_VERSION_STRING "@PROJECT_VERSION@"
+
+#cmakedefine ZEUS_COMPILER_GNU
+#cmakedefine ZEUS_COMPILER_CLANG
+#cmakedefine ZEUS_COMPILER_MSVC
+
+#if defined(__linux__)
+#define ZEUS_ASIO_HAS_IO_URING
+#elif defined(__FreeBSD__) || defined(__APPLE__)
+#define ZEUS_ASIO_HAS_KQUEUE
+#elif defined(_WIN32)
+#define ZEUS_ASIO_HAS_IOCP
+#endif
+
+#cmakedefine HAVE_OPENSSL
+#ifdef HAVE_OPENSSL
+#define ZEUS_HAS_TLS
+#endif
+
+#cmakedefine HAVE_LIBSSH
+#cmakedefine HAVE_FREERDP
+#cmakedefine HAVE_MEMCACHED
+#cmakedefine HAVE_POSTGRESQL
+#cmakedefine HAVE_MYSQL
+#cmakedefine HAVE_FIREBIRD
+#cmakedefine HAVE_PCRE2
+
+#if __cplusplus >= 202302L
+#define ZEUS_CPP23
+#endif
+

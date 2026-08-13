@@ -1,0 +1,1576 @@
+и так проект Zeus это Thc Hydra из си на С++ 23 Boost вот что вышло
+
+#pragma once
+
+#include <cstdint>
+#include <expected>
+#include <functional>
+#include <memory>
+#include <string>
+#include <string_view>
+#include <unordered_map>
+
+
+namespace zeus
+{
+    enum class ZeusExitCode : std::uint8_t {
+        normal = 0,
+        no_connect = 1,
+        protocol_error = 2,
+        service_down = 3,
+        transient_retry = 4,
+    };
+
+    enum class ZeusAttackMode : std::uint8_t {
+        password_list, login_list, password_brute,
+        password_reverse, password_null, password_same, colon_file
+    };
+
+    enum class OutputFormat {
+        plain_text,
+        jsonv1,
+        jsonv2,
+        xmlv1,
+    };
+
+    struct ZeusOptions {
+        AttackMode mode{ZeusAttackMode::password_list};
+        bool loop_users{false};
+        bool ssl{false};
+        bool restore{false};
+        Engine::Options engine{};
+        bool show_attempt{false};
+        int tasks{16};
+        int max_use{16};
+        bool try_null_password{false};
+        bool try_password_same_as_login{false};
+        bool try_password_reverse_login{false};
+        bool exit_on_first_found{false};
+        bool exit_on_first_found_global{false};
+        OutputFormat outfile_format{OutputFormat::plain_text};
+        std::optional<std::string> distributed; // "X/Y"
+        std::optional<std::string> login, login_file;
+        std::optional<std::string> password, password_file;
+        std::optional<std::filesystem::path> outfile;
+        std::optional<std::filesystem::path> targets_file; // -M
+        std::optional<std::filesystem::path> colon_file;   // -C
+        std::string misc_opts;
+        std::string server;
+        std::string service;
+        bool bruteforce{false}; // -x
+        bool skip_redo{false};  // -K
+    };
+
+    class ZeusEngine;
+
+    class ZeusEngineExit final
+    {
+        public:
+            explicit ZeusEngineExit(ZeusExitCode code) noexcept : code_(code)
+            {
+
+            }
+
+            [[nodiscard]]
+            ZeusExitCode code() const noexcept
+            {
+                return code_;
+            }
+
+        private:
+            ZeusExitCode code_;
+    };
+
+    struct ZeusServiceDescriptor {
+        std::string name;
+        std::uint16_t default_port{};
+        std::uint16_t default_ssl_port{};
+    };
+
+    class ZeusServices
+    {
+        public:
+            virtual ~ZeusServices() = default;
+
+            [[nodiscard]]
+            virtual std::string_view name() const noexcept = 0;
+
+            [[nodiscard]]
+            virtual ZeusServiceDescriptor descriptor() const = 0;
+
+            virtual void init(ZeusEngine&)
+            {
+
+            }
+
+            virtual void try_login(ZeusEngine&, std::string_view login, std::string_view password) = 0;
+
+            virtual void usage(std::ostream& os) const
+            {
+                os << "This module has no extra options.\n";
+            }
+    };
+
+
+
+    class ZeusServicesRegistry
+    {
+        public:
+            using ZeusFactory = std::function<std::unique_ptr<ZeusServices>()>;
+
+            static ZeusServicesRegistry &instance()
+            {
+                static ZeusServicesRegistry registry;
+                return registry;
+            }
+
+            void register_service(std::string name, ZeusFactory factory)
+            {
+                factories_.emplace(std::move(name), std::move(factory));
+            }
+
+            [[nodiscard]]
+            std::unique_ptr<ZeusServices> create(std::string_view name) const
+            {
+                auto it = factories_.find(std::string(name));
+                return it != factories_.end() ? it->second() : nullptr;
+            }
+
+            [[nodiscard]]
+            auto available() const
+            {
+                std::vector<std::string> names;
+                names.reserve(factories_.size());
+
+                for (auto &[k, _] : factories_)
+                {
+                    names.push_back(k);
+                }
+                return names;
+            }
+
+        private:
+            ZeusServicesRegistry() = default;
+            std::unordered_map<std::string, ZeusFactory> factories_;
+    };
+
+
+    class ZeusOptionsParser final
+    {
+        public:
+            [[nodiscard]]
+            static ZeusOptions parse(int argc, char** argv);
+    };
+
+    class ZeusServiceCatalog final
+    {
+        public:
+            static ZeusServiceCatalog& instance();
+            [[nodiscard]]
+            std::optional<ZeusServiceDescriptor> find(std::string_view name) const;
+
+            [[nodiscard]]
+            std::vector<std::string> all_names() const;
+
+            void print_supported(std::ostream&) const;
+        private:
+            ZeusServiceCatalog();
+    };
+
+// ------------------------------------------------------------------ Цели --
+    enum class ZeusTargetState {
+        active,
+        finished,
+        error,
+        unresolved,
+    };
+
+/// Заменяет hydra_target.
+    struct ZeusTarget {
+        std::string host;
+        std::uint16_t port{};
+        std::string resolved_ip;
+        ZeusTargetState state{ZeusTargetState::active};
+        std::uint64_t login_index{}, pass_index{}, sent{};
+        int fail_count{};
+        std::vector<ZeusCredential> retry_queue; // было redo_login[]/redo_pass[]
+        std::vector<std::string> skip_logins;
+    };
+
+/// Строит список целей из "server", CIDR (192.168.0.0/24), файла -M, [ipv6].
+/// Заменяет ручной CIDR-цикл и парсинг -M в main().
+    class ZeusTargetExpander final
+    {
+        public:
+            [[nodiscard]]
+            static std::vector<ZeusTarget> expand(const ZeusOptions& opts);
+    };
+
+// ------------------------------------------------------------- Credential --
+/// Заменяет fill_mem()/countlines(): ленивое, не съедающее память чтение
+/// словарей логинов/паролей (mmap + view, а не malloc всего файла разом).
+    class ZeusCredentialSource final
+    {
+        public:
+            static ZeusCredentialSource from_files(std::optional<std::filesystem::path> logins,std::optional<std::filesystem::path> passwords);
+            static ZeusCredentialSource from_colon_file(const std::filesystem::path& path);
+            static ZeusCredentialSource brute_force(std::string_view charset, std::size_t min_len, std::size_t max_len);
+
+            [[nodiscard]]
+            std::generator<std::string> logins() const;
+
+            [[nodiscard]]
+            std::generator<std::string> passwords() const;
+
+            [[nodiscard]]
+            std::uint64_t login_count() const noexcept
+            {
+                return login_count_;
+            }
+
+            [[nodiscard]]
+            std::uint64_t pass_count()  const noexcept
+            {
+                return pass_count_;
+            }
+
+        private:
+            std::uint64_t login_count_{}, pass_count_{};
+            // детали хранения: mmap-диапазоны или std::generator для брутфорса
+    };
+
+// --------------------------------------------------------------- Worker/Scheduler --
+    enum class ZeusWorkerState {
+        disabled,
+        idle,
+        active,
+    };
+
+/// Заменяет hydra_head + fork()/socketpair(). Один Worker = одна "голова"
+/// перебора для одной цели. По умолчанию — std::jthread (быстрее, легче),
+/// опционально — изолированный процесс (для хрупких библиотек типа libssh).
+    class ZeusWorker final
+    {
+    public:
+        enum class ZeusIsolation {
+            thread,
+            process,
+        };
+
+        ZeusWorker(Target& target, std::unique_ptr<Module> module, Isolation isolation);
+        ~ZeusWorker();
+
+        void start(ZeusCredentialSource& creds, Engine::Options opts);
+        void request_stop();
+
+        [[nodiscard]]
+        ZeusWorkerState state() const noexcept
+        {
+            return state_;
+        }
+
+        [[nodiscard]]
+        std::optional<ZeusCredential> last_pair() const
+        {
+            return last_pair_;
+        }
+
+    private:
+        ZeusTarget* target_;
+        std::unique_ptr<Module> module_;
+        ZeusIsolation isolation_;
+        std::atomic<ZeusWorkerState> state_{ZeusWorkerState::idle};
+        std::optional<ZeusCredential> last_pair_;
+        std::jthread thread_;      // isolation == thread
+        pid_t pid_{-1};            // isolation == process
+        int ipc_fd_{-1};
+    };
+
+/// Заменяет весь пул hydra_heads[] + ручное round-robin распределение
+/// в главном цикле main(). Command pattern: каждый Worker выполняет
+/// "попробовать следующую пару" как самостоятельную единицу работы.
+    class ZeusScheduler final
+    {
+        public:
+            ZeusScheduler(Options opts, std::vector<Target> targets, ZeusCredentialSource creds);
+            void run();                 // блокирующий главный цикл (было: while(1) в main())
+
+            [[nodiscard]]
+            ZeusStatsBoard& stats() noexcept
+            {
+                return stats_;
+            }
+
+        private:
+            ZeusOptions opts_;
+            std::vector<ZeusTarget> targets_;
+            ZeusCredentialSource creds_;
+            std::vector<std::unique_ptr<ZeusWorker>> workers_;
+            ZeusStatsBoard stats_;
+            ZeusRestoreSession restore_;
+    };
+
+// ----------------------------------------------------------------- StatsBoard --
+/// Заменяет hydra_brain. Observer: воркеры дергают методы, UI/лог подписан.
+    class ZeusStatsBoard final
+    {
+        public:
+            void on_attempt() noexcept
+            {
+                ++sent_;
+            }
+
+            void on_found() noexcept
+            {
+                ++found_;
+            }
+
+            void on_target_finished() noexcept
+            {
+                ++finished_targets_;
+            }
+
+            [[nodiscard]]
+            std::uint64_t sent() const noexcept
+            {
+                return sent_;
+            }
+
+            [[nodiscard]]
+            std::uint64_t found() const noexcept
+            {
+                return found_;
+            }
+
+        private:
+            std::atomic<std::uint64_t> sent_{}, found_{}, finished_targets_{};
+    };
+
+// -------------------------------------------------------------- RestoreSession --
+/// Заменяет hydra_restore_write/read (был ручной fwrite/fread структур —
+/// хрупко к ABI). Memento + бинарная сериализация с версионированием
+/// (Boost.Serialization или самодельный формат с magic+version+CRC32).
+    class ZeusRestoreSession final
+    {
+    public:
+        static constexpr std::string_view kMagic = "ZEUS-RESTORE";
+        static constexpr std::uint32_t kFormatVersion = 1;
+
+        void save(const std::filesystem::path& file, const ZeusOptions&,const std::vector<ZeusTarget>&, const ZeusStatsBoard&) const;
+
+        [[nodiscard]]
+        static std::optional<ZeusRestoreSession> load(const std::filesystem::path& file);
+
+        ZeusOptions options;
+        std::vector<ZeusTarget> targets;
+    };
+
+    class ZeusSignalGuard final
+    {
+        public:
+            explicit SignalGuard(ZeusScheduler& scheduler);
+            ~ZeusSignalGuard();
+            ZeusSignalGuard(const ZeusSignalGuard&) = delete;
+        private:
+            Scheduler& scheduler_;
+    };
+
+    class ZeusApplication final
+    {
+        public:
+            int run(int argc, char** argv);
+        private:
+            void print_help(bool extended) const;   // было help(int32_t ext)
+            void print_module_usage(const Options&) const; // было module_usage()
+    };
+}
+
+
+// Auto Registry Services in static link init
+// example: static zeus::ZeusAutoRegister<PostgreSQLService> reg_postgresql{"postgresql"};
+template<typename ZeusServicesT> struct ZeusAutoRegister {
+    explicit ZeusAutoRegister(std::string name) {
+        zeus::ZeusServicesRegistry::instance().register_service(std::move(name), [] {
+            return std::make_unique<ZeusServicesT>();
+        });
+    }
+};
+#include <iostream>
+#include <csignal>
+
+#include <boost/program_options.hpp>
+
+#include "zeus.hh"
+
+
+namespace zeus
+{
+    namespace po = boost::program_options;
+
+    inline constexpr std::string_view kProgram = "zeus";
+    inline constexpr std::string_view kVersion = "v1.0";
+
+    ZeusOptions ZeusOptionsParser::parse(int argc, char **argv)
+    {
+        ZeusOptions opts;
+        po::options_description desc("Zeus Options");
+        desc.add_options()
+                ("login,l", po::value<std::string>(), "single login")
+                ("login-file,L", po::value<std::string>(), "login list file")
+                ("password,p", po::value<std::string>(), "single password")
+                ("password-file,P", po::value<std::string>(), "password list file")
+                ("colon-file,C", po::value<std::string>(), "login:pass colon file")
+                ("targets-file,M", po::value<std::string>(), "targets list file")
+                ("tasks,t", po::value<int>()->default_value(16), "parallel tasks per target")
+                ("ssl,S", po::bool_switch(), "force SSL connect")
+                ("restore,R", po::bool_switch(), "resume previous session")
+                ("verbose,v", po::bool_switch(), "verbose mode")
+                ("debug,d", po::bool_switch(), "debug mode")
+                ("quiet,q", po::bool_switch(), "quiet mode")
+                ("service", po::value<std::string>(), "service://server[:port][/opts]");
+        po::variables_map vm;
+        po::store(po::command_line_parser(argc, argv).options(desc).run(), vm);
+        po::notify(vm);
+
+        if (vm.count("login-file"))
+        {
+            opts.login_file = vm["login-file"].as<std::string>();
+        }
+
+        if (vm.count("password-file"))
+        {
+            opts.password_file = vm["password-file"].as<std::string>();
+        }
+
+        if (vm.count("tasks"))
+        {
+            opts.tasks = vm["tasks"].as<int>();
+        }
+        opts.ssl = vm["ssl"].as<bool>();
+        opts.restore = vm["restore"].as<bool>();
+        opts.engine.log_level = vm["debug"].as<bool>() ? zeus::ZeusLogLevel::debug : vm["verbose"].as<bool>() ? zeus::ZeusLogLevel::verbose : zeus::ZeusLogLevel::normal;
+        opts.engine.quiet = vm["quiet"].as<bool>();
+        // ... остальное аналогично ...
+        return opts;
+    }
+
+    ZeusServiceCatalog::ZeusServiceCatalog() = default;
+
+    ZeusServiceCatalog& ZeusServiceCatalog::instance()
+    {
+        static ZeusServiceCatalog cat;
+        return cat;
+    }
+
+    std::optional<ZeusServiceDescriptor> ZeusServiceCatalog::find(std::string_view name) const
+    {
+        auto module = ZeusServicesRegistry::instance().create(name);
+        if (!module)
+        {
+            return std::nullopt;
+        }
+        return module->descriptor();
+    }
+
+    std::vector<std::string> ZeusServiceCatalog::all_names() const
+    {
+        return ZeusServicesRegistry::instance().available();
+    }
+
+// --------------------------------------------------------------- Scheduler --
+    ZeusScheduler::ZeusScheduler(ZeusOptions opts, std::vector<ZeusTarget> targets, ZeusCredentialSource creds) : opts_{std::move(opts)}, targets_{std::move(targets)}, creds_{std::move(creds)}
+    {
+
+    }
+
+    void ZeusScheduler::run()
+    {
+        // Command pattern: у каждой цели создаём Worker'ов по opts_.tasks,
+        // каждый Worker в своём jthread крутит Engine::run(module) поверх
+        // общего CredentialSource (thread-safe очередь пар).
+        for (auto& target : targets_)
+        {
+            for (int i = 0; i < opts_.tasks; ++i)
+            {
+                auto module = ZeusServicesRegistry::instance().create(opts_.service);
+
+                if (!module)
+                {
+                    throw std::runtime_error("unknown service: " + opts_.service);
+                }
+                auto worker = std::make_unique<ZeusWorker>(target, std::move(module), ZeusWorker::ZeusIsolation::thread);
+                worker->start(creds_, opts_.engine);
+                workers_.push_back(std::move(worker));
+            }
+        }
+        // ждём завершения всех воркеров (jthread джойнится в деструкторе)
+        workers_.clear();
+    }
+
+// -------------------------------------------------------------- Application --
+    int ZeusApplication::run(int argc, char** argv)
+    {
+        auto opts = ZeusOptionsParser::parse(argc, argv);
+
+        if (opts.restore)
+        {
+            auto session = ZeusRestoreSession::load("./zeus.restore");
+
+            if (!session)
+            {
+                std::cerr << "[ ETA ]: ERROR no restore file\n";
+                return -1;
+            }
+            opts = session->options;
+        }
+        auto targets = ZeusTargetExpander::expand(opts);
+        auto creds = opts.colon_file ? ZeusCredentialSource::from_colon_file(*opts.colon_file) : ZeusCredentialSource::from_files(opts.login_file, opts.password_file);
+        ZeusScheduler scheduler(opts, std::move(targets), std::move(creds));
+        ZeusSignalGuard guard(scheduler); // ставит SIGINT/SIGTERM -> корректная запись restore + выход
+        scheduler.run();
+        std::cout << std::format("[ ETA ]: Found {} valid pairs, {} attempts sent.\n",scheduler.stats().found(), scheduler.stats().sent());
+        return 0;
+    }
+
+} // namespace zeus
+
+
+
+
+int main(int argc, char** argv)
+{
+    return zeus::ZeusApplication{}.run(argc, argv);
+}
+
+
+#pragma once
+
+#include <format>
+#include <source_location>
+#include <stdexcept>
+#include <string>
+
+
+namespace zeus::contract
+{
+    enum class ZeusKind {
+        precondition,
+        postcondition,
+        invariant,
+    };
+
+    class ZeusViolationError final : public std::logic_error
+    {
+        public:
+        ZeusViolationError(ZeusKind kind, const char* expr, std::source_location loc): std::logic_error(std::format("[{}] contract violated: `{}` at {}:{} in {}()",kind_name(Zeuskind), expr, loc.file_name(),loc.line(), loc.function_name())),kind_{kind}
+            {
+
+            }
+
+            [[nodiscard]]
+            ZeusKind kind() const noexcept
+            {
+                return kind_;
+            }
+
+        private:
+            static constexpr const char* kind_name(ZeusKind k) noexcept
+            {
+                switch (k)
+                {
+                    case ZeusKind::precondition:
+                        return "PRECONDITION";
+                        break;
+                    case ZeusKind::postcondition:
+                        return "POSTCONDITION";
+                        break;
+                    case ZeusKind::invariant:
+                        return "INVARIANT";
+                        break;
+                }
+                return "UNKNOWN";
+            }
+            ZeusKind kind_;
+    };
+
+    [[noreturn]]
+    inline void fail(ZeusKind kind, const char* expr,std::source_location loc = std::source_location::current())
+    {
+        throw ViolationError(Zeuskind, expr, loc);
+    }
+
+    template <typename Self, typename Predicate> class ZeusInvariantGuard final
+    {
+        public:
+            ZeusInvariantGuard(const Self&, Predicate pred, std::source_location loc = std::source_location::current()): pred_{std::move(pred)}, loc_{loc}
+            {
+                if (!pred_())
+                {
+                    fail(ZeusKind::invariant, "on entry", loc_);
+                }
+            }
+            ~ZeusInvariantGuard() noexcept(false) {
+                if (!pred_())
+                {
+                    fail(ZeusKind::invariant, "on exit", loc_);
+                }
+            }
+            ZeusInvariantGuard(const ZeusInvariantGuard&) = delete;
+        private:
+            Predicate pred_;
+            std::source_location loc_;
+    };
+
+}
+
+
+#ifdef ZEUS_DISABLE_CONTRACTS
+#define ZEUS_EXPECTS(cond) ((void)0)
+#define ZEUS_ENSURES(cond) ((void)0)
+#define ZEUS_INVARIANT(cond) ((void)0)
+#else
+#define ZEUS_EXPECTS(cond) ((cond) ? (void)0 : ::zeus::contract::fail(::zeus::contract::ZeusKind::precondition, #cond))
+#define ZEUS_ENSURES(cond) ((cond) ? (void)0 : ::zeus::contract::fail(::zeus::contract::ZeusKind::postcondition, #cond))
+#define ZEUS_INVARIANT(cond) ((cond) ? (void)0 : ::zeus::contract::fail(::zeus::contract::ZeusKind::invariant, #cond))
+#endif
+
+
+#pragma once
+
+#include <cstddef>
+#include <expected>
+#include <span>
+
+
+namespace zeus::net
+{
+
+    enum class ZeusTransportError {
+        closed,
+        timeout,
+        io_error,
+    };
+
+    class ZeusTransport
+    {
+        public:
+            virtual ~Transport() = default;
+
+            [[nodiscard]]
+            virtual std::expected<std::size_t, ZeusTransportError>
+
+            write(std::span<const std::byte> data) = 0;
+
+            [[nodiscard]]
+            virtual std::expected<std::size_t, ZeusTransportError>
+
+            read(std::span<std::byte> buffer, std::chrono::milliseconds timeout) = 0;
+            virtual void close() noexcept = 0;
+
+            [[nodiscard]]
+            virtual bool is_open() const noexcept = 0;
+    };
+
+}
+#pragma once
+
+#include <array>
+#include <chrono>
+#include <cstddef>
+#include <expected>
+#include <format>
+#include <optional>
+#include <span>
+#include <string>
+#include <vector>
+
+#include <boost/asio.hpp>
+#include <boost/asio/ssl.hpp>
+
+#include "../../zeus-core/lib/zeus.hh"
+
+
+namespace zeus
+{
+    namespace asio = boost::asio;
+    using asio::ip::tcp;
+    using asio::ip::udp;
+
+    enum class ZeusLogLevel {
+        quiet,
+        normal,
+        verbose,
+        debug,
+    };
+
+    class ZeusLogger final
+    {
+        public:
+            explicit ZeusLogger(ZeusLogLevel level = ZeusLogLevel::normal) noexcept : level_(level)
+            {
+
+            }
+
+            void set_level(ZeusLogLevel l) noexcept
+            {
+                level_ = l;
+            }
+
+            template<typename... A> void debug(std::format_string<A...> fmt, A&&... a) const
+            {
+                if (is_debug())
+                {
+                    emit(stdout, "[ ETA ]: DEBUG ", fmt, std::forward<A>(a)...);
+                }
+            }
+
+            template<typename... A> void verbose(std::format_string<A...> fmt, A&&... a) const
+            {
+                if (is_verbose())
+                {
+                    emit(stderr, "[ ETA ]: VERBOSE ", fmt, std::forward<A>(a)...);
+                }
+            }
+
+            template<typename... A> void error(std::format_string<A...> fmt, A&&... a) const
+            {
+                emit(stderr, "[ ETA ]: ERROR ", fmt, std::forward<A>(a)...);
+            }
+
+            static void hex_dump(std::span<const std::byte> data, std::string_view title, std::FILE *out = stdout);
+
+        private:
+            ZeusLogLevel level_;
+
+            template<typename... A> void emit(std::FILE *f, std::string_view prefix, std::format_string<A...> fmt, A&... a) const
+            {
+                std::fputs(std::string(prefix).c_str(), f);
+                std::fputs(std::format(fmt, std::forward<A>(a)...).c_str(), f);
+                std::fputc('\n', f);
+            }
+    };
+
+    enum class ZeusProxyType {
+        none,
+        http_connect,
+        socks4,
+        socks5,
+    };
+
+    struct ZeusProxyConfig {
+        ZeusProxyType type{ZeusProxyType::none};
+        std::string host;
+        std::uint16_t port{};
+        std::optional<std::string> login;
+        std::optional<std::string> password;
+    };
+
+    enum class ZeusProxyError {
+        negotiation_failed,
+        auth_failed,
+        io_error,
+        unsupported,
+    };
+
+    class ZeusProxyHandshake
+    {
+        public:
+            virtual ~ZeusProxyHandshake() = default;
+
+            [[nodiscard]]
+            virtual std::expected<void, ZeusProxyError> negotiate(tcp::socket& sock, const asio::ip::address& target,std::uint16_t target_port, const ZeusProxyConfig& cfg) const = 0;
+    };
+
+    class ZeusSocks4Handshake final : public ZeusProxyHandshake
+    {
+        public:
+            [[nodiscard]]
+            std::expected<void, ZeusProxyError> negotiate(tcp::socket&, const asio::ip::address&, std::uint16_t, const ZeusProxyConfig&) const override;
+    };
+
+    class ZeusSocks5Handshake final : public ZeusProxyHandshake
+    {
+        public:
+            [[nodiscard]]
+            std::expected<void, ZeusProxyError> negotiate(tcp::socket&, const asio::ip::address&, std::uint16_t, const ZeusProxyConfig&) const override;
+    };
+
+    class ZeusHttpConnectHandshake final : public ZeusProxyHandshake
+    {
+        public:
+            [[nodiscard]]
+            std::expected<void, ZeusProxyError> negotiate(tcp::socket&, const asio::ip::address&, std::uint16_t, const ZeusProxyConfig&) const override;
+    };
+
+    class ZeusProxyHandshakeFactory final
+    {
+        public:
+            [[nodiscard]]
+            static std::unique_ptr<ZeusProxyHandshake> create(ZeusProxyType type);
+    };
+
+    class ZeusProxyPool final
+    {
+        public:
+            void add(ZeusProxyConfig cfg)
+            {
+                proxies_.push_back(std::move(cfg));
+            }
+
+            [[nodiscard]]
+            bool empty() const noexcept
+            {
+                return proxies_.empty();
+            }
+
+            [[nodiscard]]
+            const ZeusProxyConfig& pick_random() const;
+
+            [[nodiscard]]
+            const ProxyConfig& pick_random() const
+            {
+                ZEUS_EXPECTS(!proxies_.empty());
+            }
+
+        private:
+            std::vector<ZeusProxyConfig> proxies_;
+    };
+
+    enum class ZeusConnectError {
+        timeout,
+        unreachable,
+        proxy_error,
+        tls_error,
+        io_error,
+        need_root,
+    };
+
+    [[nodiscard]]
+    constexpr std::string_view to_string(ZeusConnectError e) noexcept
+    {
+        switch (e)
+        {
+            case ZeusConnectError::timeout:
+                return "[ ETA ]: connection timed out";
+                break;
+            case ZeusConnectError::unreachable:
+                return "[ ETA ]: host unreachable";
+                break;
+            case ZeusConnectError::proxy_error:
+                return "[ ETA ]: proxy negotiation failed";
+                break;
+            case ZeusConnectError::tls_error:
+                return "[ ETA ]: TLS handshake failed";
+                break;
+            case ZeusConnectError::io_error:
+                return "[ ETA ]: I/O error";
+                break;
+            case ZeusConnectError::need_root:
+                return "[ ETA ]: root privileges required for source port";
+                break;
+        }
+        return "[ ETA ]: unknown";
+    }
+
+    class ZeusConnection final
+    {
+        public:
+            explicit ZeusConnection(asio::io_context& io, ZeusLogger& log) : io_{io}, log_{log}
+            {
+
+            }
+
+            ~ZeusConnection()
+            {
+                close();
+            }
+            ZeusConnection(const ZeusConnection&) = delete;
+            ZeusConnection& operator=(const ZeusConnection&) = delete;
+            ZeusConnection(ZeusConnection&&) noexcept = default;
+            ZeusConnection& operator=(ZeusConnection&&) noexcept = default;
+
+            [[nodiscard]]
+            std::expected<void, ZeusConnectError>connect_tcp(const asio::ip::address& host, std::uint16_t port,std::chrono::seconds timeout,const ZeusProxyPool* proxies = nullptr,std::optional<std::uint16_t> source_port = std::nullopt);
+
+            [[nodiscard]]
+            std::expected<void, ZeusConnectError> connect_udp(const asio::ip::address& host, std::uint16_t port);
+
+            [[nodiscard]]
+            std::expected<void, ZeusConnectError> upgrade_to_tls(std::string_view sni_hostname);
+
+            [[nodiscard]]
+            std::expected<std::size_t, ZeusConnectError> send(std::span<const std::byte> data);
+
+            [[nodiscard]]
+            std::expected<std::size_t, ZeusConnectError> receive(std::span<std::byte> buffer, std::chrono::milliseconds timeout);
+
+            /// Аналог hydra_receive_line(): читает, пока не '\n' либо таймаут/EOF.
+            [[nodiscard]]
+            std::string receive_line(std::chrono::milliseconds timeout);
+
+            [[nodiscard]]
+            bool data_ready(std::chrono::milliseconds timeout) const;
+
+            [[nodiscard]]
+            bool using_tls() const noexcept
+            {
+                return static_cast<bool>(tls_stream_);
+            }
+
+            void close() noexcept;
+
+        private:
+            asio::io_context& io_;
+            ZeusLogger& log_;
+            std::optional<tcp::socket> tcp_socket_;
+            std::optional<udp::socket> udp_socket_;
+            std::optional<asio::ssl::context> tls_ctx_;
+            std::unique_ptr<asio::ssl::stream<tcp::socket&>> tls_stream_;
+    };
+
+    struct ZeusFinding {
+        std::uint16_t port{};
+        std::string service, host;
+        std::optional<std::string> login, password, message;
+    };
+
+    class ZeusReportSink
+    {
+        public:
+            virtual ~ZeusReportSink() = default;
+            virtual void on_found(const ZeusFinding&) = 0;
+    };
+
+    class ZeusFileReportSink final : public ZeusReportSink
+    {
+        public:
+            explicit ZeusFileReportSink(std::FILE* fp, bool colored = true) : fp_{fp}, colored_{colored} {}
+            void on_found(const ZeusFinding&) override;
+        private:
+            std::FILE* fp_;
+            bool colored_;
+    };
+
+    class ZeusCompositeReportSink final : public ZeusReportSink
+    {
+        public:
+            void add(std::shared_ptr<ZeusReportSink> sink)
+            {
+                sinks_.push_back(std::move(sink));
+            }
+
+            void on_found(const ZeusFinding& f) override
+            {
+                for (auto& s : sinks_) s->on_found(f);
+            }
+
+        private:
+            std::vector<std::shared_ptr<ZeusReportSink>> sinks_;
+    };
+
+    struct ZeusCredential {
+        std::string login, password;
+    };
+
+    class ZeusIpcChannel final
+    {
+        public:
+            explicit ZeusIpcChannel(int fd) noexcept : fd_{fd} {}
+            ~ZeusIpcChannel() { if (fd_ >= 0) ::close(fd_); }
+            ZeusIpcChannel(const ZeusIpcChannel&) = delete;
+            ZeusIpcChannel& operator=(const ZeusIpcChannel&) = delete;
+            ZeusIpcChannel(ZeusIpcChannel&& o) noexcept : fd_{o.fd_}
+            {
+                o.fd_ = -1;
+            }
+
+            [[nodiscard]]
+            std::optional<ZeusCredential> next_pair();
+
+            void report_done();
+            void report_found(std::string_view login);
+            void report_skip(std::string_view login);
+
+        private:
+            int fd_;
+            static constexpr std::array<std::byte, 5> kExit{std::byte{0x00}, std::byte{0xff}, std::byte{0x00}, std::byte{0xff}, std::byte{0x00}};
+    };
+
+    class ZeusEngine final
+    {
+        public:
+            struct ZeusOptions {
+                ZeusLogLevel log_level{ZeusLogLevel::normal};
+                std::chrono::seconds connect_timeout{30};
+                std::uint16_t target_port{};
+                bool ssl{false};
+                std::optional<std::uint16_t> source_port;
+                int connect_retries{1};
+                bool do_retry{true};       // было: int32_t do_retry (hydra-mod.c)
+                bool old_ssl{false};       // было: int32_t old_ssl
+                bool colored_output{true}; // было: uint32_t colored_output
+                bool quiet{false};
+            };
+
+            ZeusEngine(ZeusOptions opts, ZeusIpcChannel ipc, ZeusCompositeReportSink reporter): options_{opts}, logger_{opts.log_level}, ipc_{std::move(ipc)},reporter_{std::move(reporter)}
+            {
+
+            }
+
+            [[nodiscard]]
+            ZeusLogger& logger() noexcept
+            {
+                return logger_;
+            }
+
+            [[nodiscard]]
+            const ZeusOptions& options() const noexcept
+            {
+                return options_;
+            }
+
+            [[nodiscard]]
+            ZeusProxyPool& proxies() noexcept
+            {
+                return proxies_;
+            }
+
+            [[nodiscard]]
+            ZeusIpcChannel& ipc() noexcept
+            {
+                return ipc_;
+            }
+
+            [[nodiscard]]
+            ZeusCompositeReportSink& reporter() noexcept
+            {
+                return reporter_;
+            }
+
+            [[nodiscard]]
+            std::unique_ptr<ZeusConnection> make_connection()
+            {
+                return std::make_unique<ZeusConnection>(io_, logger_);
+            }
+
+            void report_success(std::string service, std::string host,std::optional<std::string> login,std::optional<std::string> password,std::optional<std::string> message = std::nullopt)
+            {
+                reporter_.on_found(ZeusFinding{options_.target_port, std::move(service), std::move(host),std::move(login), std::move(password), std::move(message)});
+            }
+
+            [[noreturn]]
+            void exit_worker(ZeusExitCode code)
+            {
+                throw ZeusEngineExit{code};
+            }
+
+            void run(ZeusServices& services)
+            {
+                services.init(*this);
+
+                while (true)
+                {
+                    auto cred = ipc_.next_pair();
+
+                    if (!cred)
+                    {
+                        break;
+                    }
+                    try {
+                        services.try_login(*this, cred->login, cred->password);
+                        ipc_.report_done();
+                    } catch (const ZeusEngineExit& e) {
+                        if (e.code() == ZeusExitCode::normal)
+                        {
+                            ipc_.report_done();
+                        }
+                        throw;
+                    }
+                }
+            }
+
+        private:
+            ZeusOptions options_;
+            ZeusLogger logger_;
+            asio::io_context io_;
+            ZeusProxyPool proxies_;
+            ZeusIpcChannel ipc_;
+            ZeusCompositeReportSink reporter_;
+    };
+}
+
+#include <iostream>
+#include <cctype>
+#include <random>
+#include <format>
+#include <unistd.h>
+
+#include <boost/asio/connect.hpp>
+#include <boost/asio/read_until.hpp>
+#include <boost/asio/write.hpp>
+
+#include "zeus_engine.hh"
+
+namespace zeus
+{
+    void ZeusLogger::hex_dump(std::span<const std::byte> data, std::string_view title, std::FILE *out)
+    {
+        if (!title.empty())
+        {
+            std::fprintf(out, "%.*s (%zu bytes):\n", static_cast<int>(title.size()), title.data(), data.size());
+        }
+        constexpr std::size_t kRow = 16;
+
+        for (std::size_t i = 0; i < data.size(); i += kRow)
+        {
+            std::fprintf(out, "%04zx: ", i);
+            std::size_t row_len = std::min(kRow, data.size() - i);
+
+            for (std::size_t j = 0; j < row_len; ++j)
+            {
+                std::fprintf(out, "%02x%s", std::to_integer<unsigned>(data[i + j]), (j % 2) ? " " : "");
+            }
+            std::fputs(" [ ", out);
+
+            for (std::size_t j = 0; j < row_len; ++j)
+            {
+                auto c = std::to_integer<unsigned char>(data[i + j]);
+                std::fputc(std::isprint(c) ? static_cast<char>(c) : '.', out);
+            }
+            std::fputs(" ]\n", out);
+        }
+    }
+
+
+
+    std::unique_ptr<ZeusProxyHandshake> ZeusProxyHandshakeFactory::create(ZeusProxyType type)
+    {
+        switch (type)
+        {
+            case ZeusProxyType::socks4:
+                return std::make_unique<ZeusSocks4Handshake>();
+                break;
+            case ZeusProxyType::socks5:
+                return std::make_unique<ZeusSocks5Handshake>();
+                break;
+            case ZeusProxyType::http_connect:
+                return std::make_unique<ZeusHttpConnectHandshake>();
+                break;
+            default:
+                return nullptr;
+        }
+    }
+
+    const ZeusProxyConfig &ZeusProxyPool::pick_random() const
+    {
+        static thread_local std::mt19937_64 rng{std::random_device()()};
+        std::uniform_int_distribution<std::size_t> dist(0, proxies_.size() - 1);
+        return proxies_[dist(rng)];
+    }
+
+    std::expected<void, ZeusProxyError> ZeusSocks4Handshake::negotiate(tcp::socket &socket, const asio::ip::address &target,std::uint16_t port, const ZeusProxyConfig &) const
+    {
+        if (!target.is_v4())
+        {
+            return std::unexpected(ZeusProxyError::unsupported); // SOCKS4 = Only IPv4
+        }
+        std::array<std::byte, 9> req{};
+        req[0] = std::byte{4}; // connect
+        req[1] = std::byte{1}; // connect
+        auto p = target.to_v4().to_bytes();
+        std::uint16_t nport = htons(port);
+        std::memcpy(&req[2], &nport, 2);
+        std::memcpy(&req[4], p.data(), 4);
+        req[8] = std::byte{0};
+        boost::system::error_code ec;
+        asio::write(socket, asio::buffer(req), ec);
+
+        if (ec)
+        {
+            return std::unexpected(ZeusProxyError::io_error);
+        }
+        std::array<std::byte, 8> reply{};
+        asio::read(socket, asio::buffer(reply), ec);
+
+        if (ec)
+        {
+            return std::unexpected(ZeusProxyError::io_error);
+        }
+
+        if (std::to_integer<int>(reply[1]) != 90)
+        {
+            return std::unexpected(ZeusProxyError::negotiation_failed);
+        }
+        return {};
+    }
+
+
+    std::expected<void, ZeusProxyError> ZeusSocks5Handshake::negotiate(tcp::socket& sock, const asio::ip::address& target,std::uint16_t port, const ZeusProxyConfig& cfg) const
+    {
+        boost::system::error_code ec;
+        bool need_auth = cfg.login.has_value();
+        std::array<std::byte, 3> greet{std::byte{5}, std::byte{1},need_auth ? std::byte{2} : std::byte{0}};
+        asio::write(sock, asio::buffer(greet), ec);
+        std::array<std::byte, 2> gresp{};
+        asio::read(sock, asio::buffer(gresp), ec);
+
+        if (ec || std::to_integer<int>(gresp[1]) == 0xff)
+        {
+            return std::unexpected(ZeusProxyError::negotiation_failed);
+        }
+
+        if (need_auth)
+        {
+            std::string user = *cfg.login, pass = cfg.password.value_or("");
+            std::vector<std::byte> auth;
+            auth.push_back(std::byte{1});
+            auth.push_back(std::byte(user.size()));
+            for (char c : user) auth.push_back(std::byte(c));
+            auth.push_back(std::byte(pass.size()));
+            for (char c : pass) auth.push_back(std::byte(c));
+            asio::write(sock, asio::buffer(auth), ec);
+            std::array<std::byte, 2> aresp{};
+            asio::read(sock, asio::buffer(aresp), ec);
+
+            if (ec || std::to_integer<int>(aresp[1]) != 0)
+            {
+                return std::unexpected(ZeusProxyError::auth_failed);
+            }
+        }
+        std::vector<std::byte> req{std::byte{5}, std::byte{1}, std::byte{0}};
+
+        if (target.is_v6())
+        {
+            req.push_back(std::byte{4});
+            auto b = target.to_v6().to_bytes();
+            for (auto x : b) req.push_back(std::byte(x));
+        }
+        else
+        {
+            req.push_back(std::byte{1});
+            auto b = target.to_v4().to_bytes();
+            for (auto x : b) req.push_back(std::byte(x));
+        }
+        std::uint16_t nport = htons(port);
+        req.push_back(std::byte(nport & 0xff));
+        req.push_back(std::byte(nport >> 8));
+        asio::write(sock, asio::buffer(req), ec);
+        std::array<std::byte, 10> resp{};
+        asio::read(sock, asio::buffer(resp), ec);
+
+        if (ec || std::to_integer<int>(resp[1]) != 0)
+        {
+            return std::unexpected(ZeusProxyError::negotiation_failed);
+        }
+        return {};
+    }
+
+    std::expected<void, ZeusProxyError> ZeusHttpConnectHandshake::negotiate(tcp::socket& sock, const asio::ip::address& target,std::uint16_t port, const ZeusProxyConfig& cfg) const
+    {
+        std::string req = std::format("CONNECT {}:{} HTTP/1.0\r\n", target.to_string(), port);
+
+        if (cfg.login)
+        {
+            req += std::format("Proxy-Authorization: Basic {}\r\n", *cfg.login);
+        }
+        req += "\r\n";
+        boost::system::error_code ec;
+        asio::write(sock, asio::buffer(req), ec);
+
+        if (ec)
+        {
+            return std::unexpected(ZeusProxyError::io_error);
+        }
+        asio::streambuf buf;
+        asio::read_until(sock, buf, "\r\n", ec);
+
+        if (ec)
+        {
+            return std::unexpected(ZeusProxyError::io_error);
+        }
+        std::istream is(&buf);
+        std::string status_line;
+        std::getline(is, status_line);
+        if (status_line.find("HTTP/") != 0 || status_line.find(" 2") == std::string::npos)
+        {
+            return std::unexpected(ZeusProxyError::negotiation_failed);
+        }
+        return {};
+    }
+
+    std::expected<void, ZeusConnectError> ZeusConnection::connect_tcp(const asio::ip::address& host, std::uint16_t port,std::chrono::seconds timeout, const ZeusProxyPool* proxies,std::optional<std::uint16_t> source_port)
+    {
+        tcp_socket_.emplace(io_);
+        boost::system::error_code ec;
+
+        if (source_port)
+        {
+            tcp_socket_->open(host.is_v6() ? tcp::v6() : tcp::v4(), ec);
+            tcp_socket_->set_option(asio::socket_base::reuse_address(true));
+            tcp_socket_->bind(tcp::endpoint(host.is_v6() ? tcp::v6() : tcp::v4(), *source_port), ec);
+            if (ec == boost::asio::error::access_denied) return std::unexpected(ZeusConnectError::need_root);
+        }
+        asio::ip::address connect_target = host;
+        std::uint16_t connect_port = port;
+        bool via_proxy = proxies && !proxies->empty();
+        const ZeusProxyConfig* proxy = nullptr;
+
+        if (via_proxy)
+        {
+            proxy = &proxies->pick_random();
+            connect_target = asio::ip::make_address(proxy->host, ec);
+            connect_port = proxy->port;
+        }
+        // Таймаут через steady_timer вместо SIGALRM/alarm().
+        asio::steady_timer timer(io_);
+        timer.expires_after(timeout);
+        bool timed_out = false;
+
+        timer.async_wait([&](const boost::system::error_code& tec) {
+            if (!tec)
+            {
+                timed_out = true; tcp_socket_->cancel();
+            }
+        });
+
+        tcp_socket_->async_connect(tcp::endpoint(connect_target, connect_port),[&](const boost::system::error_code& cec) { ec = cec; });
+        io_.restart();
+        io_.run();
+        timer.cancel();
+
+        if (timed_out)
+        {
+            return std::unexpected(ZeusConnectError::timeout);
+        }
+
+        if (ec)
+        {
+            return std::unexpected(ZeusConnectError::unreachable);
+        }
+
+        if (via_proxy && proxy->type != ZeusProxyType::none)
+        {
+            auto handshake = ZeusProxyHandshakeFactory::create(proxy->type);
+            auto res = handshake->negotiate(*tcp_socket_, host, port, *proxy);
+
+            if (!res)
+            {
+                close();
+                return std::unexpected(ZeusConnectError::proxy_error);
+            }
+        }
+        return {};
+    }
+
+    std::expected<void, ZeusConnectError> ZeusConnection::connect_udp(const asio::ip::address& host, std::uint16_t port)
+    {
+        udp_socket_.emplace(io_, host.is_v6() ? udp::v6() : udp::v4());
+        boost::system::error_code ec;
+        udp_socket_->connect(udp::endpoint(host, port), ec);
+
+        if (ec)
+        {
+            return std::unexpected(ZeusConnectError::unreachable);
+        }
+        return {};
+    }
+
+    std::expected<void, ZeusConnectError> ZeusConnection::upgrade_to_tls(std::string_view sni)
+    {
+        if (!tcp_socket_)
+        {
+            return std::unexpected(ZeusConnectError::io_error);
+        }
+        tls_ctx_.emplace(asio::ssl::context::tls_client);
+        tls_ctx_->set_verify_mode(asio::ssl::verify_none); // как и оригинал: без верификации CN
+        tls_stream_ = std::make_unique<asio::ssl::stream<tcp::socket&>>(*tcp_socket_, *tls_ctx_);
+        SSL_set_tlsext_host_name(tls_stream_->native_handle(), std::string{sni}.c_str());
+        boost::system::error_code ec;
+        tls_stream_->handshake(asio::ssl::stream_base::client, ec);
+
+        if (ec)
+        {
+            tls_stream_.reset();
+            return std::unexpected(ZeusConnectError::tls_error);
+        }
+        return {};
+    }
+
+    std::expected<std::size_t, ZeusConnectError> ZeusConnection::send(std::span<const std::byte> data)
+    {
+        boost::system::error_code ec;
+        std::size_t n = tls_stream_ ? asio::write(*tls_stream_, asio::buffer(data.data(), data.size()), ec) : asio::write(*tcp_socket_,  asio::buffer(data.data(), data.size()), ec);
+
+        if (ec)
+        {
+            return std::unexpected(ZeusConnectError::io_error);
+        }
+        return n;
+    }
+
+    std::expected<std::size_t, ZeusConnectError> ZeusConnection::receive(std::span<std::byte> buffer, std::chrono::milliseconds timeout)
+    {
+        boost::system::error_code ec;
+        bool timed_out = false;
+        asio::steady_timer timer(io_);
+        timer.expires_after(timeout);
+        std::size_t n = 0;
+
+        auto on_read = [&](const boost::system::error_code& rec, std::size_t bytes)
+        {
+            ec = rec; n = bytes;
+        };
+
+        if (tls_stream_)
+        {
+            tls_stream_->async_read_some(asio::buffer(buffer.data(), buffer.size()), on_read);
+        }
+        else
+        {
+            tcp_socket_->async_read_some(asio::buffer(buffer.data(), buffer.size()), on_read);
+        }
+
+        timer.async_wait([&](const boost::system::error_code& tec) {
+            if (!tec)
+            {
+                timed_out = true;
+                tcp_socket_->cancel();
+            }
+        });
+        io_.restart();
+        io_.run();
+        timer.cancel();
+
+        if (timed_out)
+        {
+            return std::unexpected(ZeusConnectError::timeout);
+        }
+
+        if (ec)
+        {
+            return std::unexpected(ZeusConnectError::io_error);
+        }
+        return n;
+    }
+
+    std::string ZeusConnection::receive_line(std::chrono::milliseconds timeout)
+    {
+        std::string result;
+        std::array<std::byte, 1024> chunk{};
+
+        while (data_ready(timeout))
+        {
+            auto res = receive(chunk, timeout);
+
+            if (!res || *res == 0)
+            {
+                break;
+            }
+
+            for (std::size_t i = 0; i < *res; ++i)
+            {
+                result.push_back(chunk[i] == std::byte{0} ? ' ' : static_cast<char>(chunk[i]));
+            }
+
+            if (!result.empty() && result.back() == '\n')
+            {
+                break;
+            }
+        }
+        return result;
+    }
+
+    bool ZeusConnection::data_ready(std::chrono::milliseconds timeout) const
+    {
+        if (!tcp_socket_)
+        {
+            return false;
+        }
+        return tcp_socket_->available() > 0; // упрощённая неблокирующая проверка
+    }
+
+    void ZeusConnection::close() noexcept
+    {
+        boost::system::error_code ec;
+
+        if (tls_stream_)
+        {
+            tls_stream_->shutdown(ec);
+            tls_stream_.reset();
+        }
+
+        if (tcp_socket_ && tcp_socket_->is_open())
+        {
+            tcp_socket_->close(ec);
+        }
+
+        if (udp_socket_ && udp_socket_->is_open())
+        {
+            udp_socket_->close(ec);
+        }
+    }
+
+    void ZeusFileReportSink::on_found(const ZeusFinding& f)
+    {
+        std::string line = std::format("[{}][{}] host: {}", f.port, f.service, f.host);
+
+        if (f.login)
+        {
+            line += std::format(" login: {}", *f.login);
+        }
+
+        if (f.password)
+        {
+            line += std::format(" password: {}", *f.password);
+        }
+
+        if (f.message)
+        {
+            line += std::format(" [{}]", *f.message);
+        }
+        std::fprintf(fp_, "%s\n", line.c_str());
+        std::fflush(fp_);
+    }
+
+    std::optional<ZeusCredential> ZeusIpcChannel::next_pair()
+    {
+        std::array<std::byte, 260> buf{};
+        ssize_t got = ::read(fd_, buf.data(), buf.size() - 1);
+
+        if (got <= 0)
+        {
+            return std::nullopt;
+        }
+
+        if (static_cast<std::size_t>(got) == kExit.size() && std::equal(kExit.begin(), kExit.end(), buf.begin()))
+        {
+            return std::nullopt;
+        }
+        auto* raw = reinterpret_cast<char*>(buf.data());
+        std::string login(raw);
+        std::string password(raw + login.size() + 1);
+        return ZeusCredential{std::move(login), std::move(password)};
+    }
+
+    void ZeusIpcChannel::report_done()
+    {
+        char c = 'N';
+        (void)!::write(fd_, &c, 1);
+    }
+
+    void ZeusIpcChannel::report_found(std::string_view login)
+    {
+        char c = 'F';
+        (void)!::write(fd_, &c, 1);
+        (void)!::write(fd_, login.data(), login.size() + 1);
+    }
+
+    void ZeusIpcChannel::report_skip(std::string_view login)
+    {
+        char c = 'f';
+        (void)!::write(fd_, &c, 1);
+        (void)!::write(fd_, login.data(), login.size() + 1);
+    }
+}
+
+
