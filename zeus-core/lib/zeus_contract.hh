@@ -17,7 +17,7 @@ namespace zeus::contract
     class ZeusViolationError final : public std::logic_error
     {
         public:
-            ZeusViolationError(ZeusKind kind, const char* expr, std::source_location loc): std::logic_error(std::format("[{}] contract violated: `{}` at {}:{} in {}()",kind_name(ZeusKind), expr, loc.file_name(),loc.line(), loc.function_name())),kind_{kind}
+            ZeusViolationError(ZeusKind kind, const char* expr, std::source_location loc): std::logic_error(std::format("[{}] contract violated: `{}` at {}:{} in {}()",kind_name(kind), expr, loc.file_name(),loc.line(), loc.function_name())),kind_{kind}
                 {
 
                 }
@@ -51,7 +51,7 @@ namespace zeus::contract
     [[noreturn]]
     inline void fail(ZeusKind kind, const char* expr,std::source_location loc = std::source_location::current())
     {
-        throw ViolationError(Zeuskind, expr, loc);
+        throw ZeusViolationError(kind, expr, loc);
     }
 
     template <typename Self, typename Predicate> class ZeusInvariantGuard final

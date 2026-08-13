@@ -37,11 +37,11 @@ namespace zeus
     };
 
     struct ZeusOptions {
-        AttackMode mode{ZeusAttackMode::password_list};
+        ZeusAttackMode mode{ZeusAttackMode::password_list};
         bool loop_users{false};
         bool ssl{false};
         bool restore{false};
-        Engine::Options engine{};
+        ZeusEngine::Options engine{};
         bool show_attempt{false};
         int tasks{16};
         int max_use{16};
@@ -259,10 +259,10 @@ namespace zeus
             process,
         };
 
-        ZeusWorker(Target& target, std::unique_ptr<Module> module, Isolation isolation);
+        ZeusWorker(ZeusTarget& target, std::unique_ptr<Module> module, ZeusIsolation isolation);
         ~ZeusWorker();
 
-        void start(ZeusCredentialSource& creds, Engine::Options opts);
+        void start(ZeusCredentialSource& creds, ZeusEngine::Options opts);
         void request_stop();
 
         [[nodiscard]]
@@ -294,7 +294,7 @@ namespace zeus
     class ZeusScheduler final
     {
         public:
-            ZeusScheduler(Options opts, std::vector<Target> targets, ZeusCredentialSource creds);
+            ZeusScheduler(ZeusOptions opts, std::vector<ZeusTarget> targets, ZeusCredentialSource creds);
             void run();                 // блокирующий главный цикл (было: while(1) в main())
 
             [[nodiscard]]
@@ -370,11 +370,12 @@ namespace zeus
     class ZeusSignalGuard final
     {
         public:
-            explicit SignalGuard(ZeusScheduler& scheduler);
-            ~ZeusSignalGuard();
+            explicit ZeusSignalGuard(ZeusScheduler& scheduler);
             ZeusSignalGuard(const ZeusSignalGuard&) = delete;
+            ~ZeusSignalGuard();
+
         private:
-            Scheduler& scheduler_;
+            ZeusScheduler& scheduler_;
     };
 
     class ZeusApplication final
