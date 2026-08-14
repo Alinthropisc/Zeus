@@ -50,7 +50,9 @@ add_executable(zeus main.cpp
         zeus-core/lib/pw-inspector.c
         zeus-core/lib/sasl.c
         zeus-core/lib/sasl.h
-        zeus-core/lib/zeus_types.hh)
+        zeus-core/lib/zeus_types.hh
+        zeus-core/lib/zeus_crypto.cc
+        zeus-core/lib/zeus_crypto.hh)
 
 
 
