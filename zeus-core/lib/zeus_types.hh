@@ -88,6 +88,22 @@ namespace zeus
         timeout,
         io_error,
     };
+
+    enum class ZeusAuthResult {
+        success,        // credentials accepted
+        failure,        // credentials rejected (this pair is simply wrong)
+        retry,          // transient issue (rate limit, busy) — requeue the pair
+        protocol_error, // service spoke something we don't understand — abort target
+    };
+
+    enum class ZeusDbDialect {
+        postgres,
+        mysql,
+        mssql,
+        oracle,
+        redis,
+        memcached,
+    };
 }
 
 

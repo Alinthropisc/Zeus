@@ -4,6 +4,7 @@
 #include <deque>
 #include <memory>
 #include <mutex>
+#include <thread>
 
 #include "../../zeus-core/lib/zeus_contract.hh"
 #include "zeus_engine.hh"
@@ -122,7 +123,7 @@ namespace zeus::net
         /// @post returned pointer is non-null and its socket is either fresh
         ///       from the factory or a previously-returned, still-open one.
         [[nodiscard]]
-        std::unique_ptr<Connection> acquire(zeus::ZeusEngine& engine)
+        std::unique_ptr<ZeusConnection> acquire(zeus::ZeusEngine& engine)
         {
             std::scoped_lock lock{mutex_};
 
@@ -137,7 +138,7 @@ namespace zeus::net
 
         /// Returns a still-usable connection back to the pool; drops it
         /// otherwise (e.g. after a protocol error that poisoned the stream).
-        void release(std::unique_ptr<Connection> conn, bool reusable)
+        void release(std::unique_ptr<ZeusConnection> conn, bool reusable)
         {
             ZEUS_EXPECTS(conn != nullptr);
             std::scoped_lock lock{mutex_};
@@ -158,12 +159,12 @@ namespace zeus::net
     class ZeusNetworkService : public zeus::ZeusServices
     {
     public:
-        explicit ZeusNetworkModule(std::unique_ptr<RetryPolicy> retry,std::shared_ptr<RateLimiter> limiter = nullptr): retry_{std::move(retry)}, limiter_{std::move(limiter)}
+        explicit ZeusNetworkService(std::unique_ptr<ZeusRetryPolicy> retry,std::shared_ptr<ZeusRateLimiter> limiter = nullptr): retry_{std::move(retry)}, limiter_{std::move(limiter)}
         {
             ZEUS_EXPECTS(retry_ != nullptr);
         }
 
-        ~ZeusNetworkModule() override = default;
+        ~ZeusNetworkService() override = default;
 
         /// Template Method: establishes a connection honouring retry policy
         /// and rate limiting, then hands control to the protocol layer via
@@ -208,8 +209,8 @@ namespace zeus::net
         virtual boost::asio::ip::address resolve_target(zeus::ZeusEngine&) const = 0;
 
     private:
-        std::unique_ptr<RetryPolicy> retry_;
-        std::shared_ptr<RateLimiter> limiter_;
+        std::unique_ptr<ZeusRetryPolicy> retry_;
+        std::shared_ptr<ZeusRateLimiter> limiter_;
     };
 }
 

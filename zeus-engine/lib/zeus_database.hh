@@ -1,21 +1,23 @@
 #pragma once
 
 #include <string>
+#include <thread>
 
 #include "../../zeus-core/lib/zeus_contract.hh"
+#include "../../zeus-core/lib/zeus_types.hh"
 #include "zeus_proto.hh"
 #include "zeus_sasl.hh"   // zeus::crypto::SaslExchange / SaslExchangeFactory
 
 namespace zeus::database
 {
-    enum class ZeusDbDialect {
-        postgres,
-        mysql,
-        mssql,
-        oracle,
-        redis,
-        memcached,
-    };
+//    enum class ZeusDbDialect {
+//        postgres,
+//        mysql,
+//        mssql,
+//        oracle,
+//        redis,
+//        memcached,
+//    };
 
     class ZeusDatabaseService : public zeus::proto::ZeusProtocolService
     {

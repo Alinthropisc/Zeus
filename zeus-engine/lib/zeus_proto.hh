@@ -5,17 +5,18 @@
 #include <vector>
 
 #include "../../zeus-core/lib/zeus_contract.hh"
+#include "../../zeus-core/lib/zeus_types.hh"
 #include "zeus_net.hh"
 #include "zeus_engine.hh"
 
 namespace zeus::proto
 {
-    enum class ZeusAuthResult {
-        success,        // credentials accepted
-        failure,        // credentials rejected (this pair is simply wrong)
-        retry,          // transient issue (rate limit, busy) — requeue the pair
-        protocol_error, // service spoke something we don't understand — abort target
-    };
+//    enum class ZeusAuthResult {
+//        success,        // credentials accepted
+//        failure,        // credentials rejected (this pair is simply wrong)
+//        retry,          // transient issue (rate limit, busy) — requeue the pair
+//        protocol_error, // service spoke something we don't understand — abort target
+//    };
 
     class ZeusPacketCodec
     {
