@@ -82,7 +82,7 @@ namespace zeus::proto
     class ZeusProtocolService : public zeus::ZeusServices
     {
         public:
-            using ZeusNetworkService::ZeusNetworkService;
+            // using ZeusNetworkService::ZeusNetworkService;
 
             explicit ZeusProtocolService(std::unique_ptr<zeus::net::ZeusRetryPolicy> retry, std::shared_ptr<zeus::net::ZeusRateLimiter> limiter = nullptr): connector_{std::move(retry), std::move(limiter)}
             {
@@ -98,7 +98,10 @@ namespace zeus::proto
             void try_login(zeus::ZeusEngine& engine, std::string_view login, std::string_view password) final
             {
                 ZEUS_EXPECTS(!login.empty() || allow_empty_login());
-                auto conn = connect_with_policy(engine);
+                // auto conn = connect_with_policy(engine);
+                auto conn = connector_.connect(engine, [this](zeus::ZeusEngine &e) {
+                    return resolve_target(e);
+                });
 
                 if (!conn)
                 {
