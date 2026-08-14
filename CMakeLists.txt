@@ -49,7 +49,8 @@ add_executable(zeus main.cpp
         zeus-core/lib/postgres_ext.h
         zeus-core/lib/pw-inspector.c
         zeus-core/lib/sasl.c
-        zeus-core/lib/sasl.h)
+        zeus-core/lib/sasl.h
+        zeus-core/lib/zeus_types.hh)
 
 
 

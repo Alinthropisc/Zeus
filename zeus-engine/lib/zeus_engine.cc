@@ -9,6 +9,7 @@
 #include <boost/asio/write.hpp>
 
 #include "zeus_engine.hh"
+#include "../../zeus-core/lib/zeus_types.hh"
 
 namespace zeus
 {

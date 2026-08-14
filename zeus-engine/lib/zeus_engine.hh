@@ -14,6 +14,7 @@
 #include <boost/asio/ssl.hpp>
 
 #include "../../zeus-core/lib/zeus.hh"
+#include "../../zeus-core/lib/zeus_types.hh"
 
 
 namespace zeus
@@ -22,12 +23,12 @@ namespace zeus
     using asio::ip::tcp;
     using asio::ip::udp;
 
-    enum class ZeusLogLevel {
-        quiet,
-        normal,
-        verbose,
-        debug,
-    };
+//    enum class ZeusLogLevel {
+//        quiet,
+//        normal,
+//        verbose,
+//        debug,
+//    };
 
     class ZeusLogger final
     {
@@ -76,27 +77,27 @@ namespace zeus
             }
     };
 
-    enum class ZeusProxyType {
-        none,
-        http_connect,
-        socks4,
-        socks5,
-    };
+//    enum class ZeusProxyType {
+//        none,
+//        http_connect,
+//        socks4,
+//        socks5,
+//    };
+//
+//    struct ZeusProxyConfig {
+//        ZeusProxyType type{ZeusProxyType::none};
+//        std::string host;
+//        std::uint16_t port{};
+//        std::optional<std::string> login;
+//        std::optional<std::string> password;
+//    };
 
-    struct ZeusProxyConfig {
-        ZeusProxyType type{ZeusProxyType::none};
-        std::string host;
-        std::uint16_t port{};
-        std::optional<std::string> login;
-        std::optional<std::string> password;
-    };
-
-    enum class ZeusProxyError {
-        negotiation_failed,
-        auth_failed,
-        io_error,
-        unsupported,
-    };
+//    enum class ZeusProxyError {
+//        negotiation_failed,
+//        auth_failed,
+//        io_error,
+//        unsupported,
+//    };
 
     class ZeusProxyHandshake
     {
@@ -162,14 +163,14 @@ namespace zeus
             std::vector<ZeusProxyConfig> proxies_;
     };
 
-    enum class ZeusConnectError {
-        timeout,
-        unreachable,
-        proxy_error,
-        tls_error,
-        io_error,
-        need_root,
-    };
+//    enum class ZeusConnectError {
+//        timeout,
+//        unreachable,
+//        proxy_error,
+//        tls_error,
+//        io_error,
+//        need_root,
+//    };
 
     [[nodiscard]]
     constexpr std::string_view to_string(ZeusConnectError e) noexcept
@@ -254,11 +255,11 @@ namespace zeus
             std::unique_ptr<asio::ssl::stream<tcp::socket&>> tls_stream_;
     };
 
-    struct ZeusFinding {
-        std::uint16_t port{};
-        std::string service, host;
-        std::optional<std::string> login, password, message;
-    };
+//    struct ZeusFinding {
+//        std::uint16_t port{};
+//        std::string service, host;
+//        std::optional<std::string> login, password, message;
+//    };
 
     class ZeusReportSink
     {
@@ -294,9 +295,9 @@ namespace zeus
             std::vector<std::shared_ptr<ZeusReportSink>> sinks_;
     };
 
-    struct ZeusCredential {
-        std::string login, password;
-    };
+//    struct ZeusCredential {
+//        std::string login, password;
+//    };
 
     class ZeusIpcChannel final
     {

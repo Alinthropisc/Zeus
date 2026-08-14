@@ -4,15 +4,16 @@
 #include <expected>
 #include <span>
 
+#include "zeus_types.hh"
 
 namespace zeus::net
 {
 
-    enum class ZeusTransportError {
-        closed,
-        timeout,
-        io_error,
-    };
+//    enum class ZeusTransportError {
+//        closed,
+//        timeout,
+//        io_error,
+//    };
 
     class ZeusTransport
     {

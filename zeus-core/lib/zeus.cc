@@ -4,6 +4,7 @@
 #include <boost/program_options.hpp>
 
 #include "zeus.hh"
+#include "zeus_types.hh"
 
 
 namespace zeus

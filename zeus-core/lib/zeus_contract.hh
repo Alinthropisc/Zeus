@@ -5,28 +5,29 @@
 #include <stdexcept>
 #include <string>
 
+#include "zeus_types.hh"
 
 namespace zeus::contract
 {
-    enum class ZeusKind {
-        precondition,
-        postcondition,
-        invariant,
-    };
+//    enum class ZeusKind {
+//        precondition,
+//        postcondition,
+//        invariant,
+//    };
 
     class ZeusViolationError final : public std::logic_error
     {
         public:
             ZeusViolationError(ZeusKind kind, const char* expr, std::source_location loc): std::logic_error(std::format("[{}] contract violated: `{}` at {}:{} in {}()",kind_name(kind), expr, loc.file_name(),loc.line(), loc.function_name())),kind_{kind}
-                {
+            {
 
-                }
+            }
 
-                [[nodiscard]]
-                ZeusKind kind() const noexcept
-                {
-                    return kind_;
-                }
+            [[nodiscard]]
+            ZeusKind kind() const noexcept
+            {
+                return kind_;
+            }
 
         private:
             static constexpr const char* kind_name(ZeusKind k) noexcept
@@ -71,6 +72,7 @@ namespace zeus::contract
                 }
             }
             ZeusInvariantGuard(const ZeusInvariantGuard&) = delete;
+
         private:
             Predicate pred_;
             std::source_location loc_;

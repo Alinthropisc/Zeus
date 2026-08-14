@@ -11,30 +11,30 @@
 
 namespace zeus
 {
-    enum class ZeusExitCode : std::uint8_t {
-        normal = 0,
-        no_connect = 1,
-        protocol_error = 2,
-        service_down = 3,
-        transient_retry = 4,
-    };
-
-    enum class ZeusAttackMode : std::uint8_t {
-        password_list,
-        login_list,
-        password_brute,
-        password_reverse,
-        password_null,
-        password_same,
-        colon_file,
-    };
-
-    enum class OutputFormat {
-        plain_text,
-        jsonv1,
-        jsonv2,
-        xmlv1,
-    };
+//    enum class ZeusExitCode : std::uint8_t {
+//        normal = 0,
+//        no_connect = 1,
+//        protocol_error = 2,
+//        service_down = 3,
+//        transient_retry = 4,
+//    };
+//
+//    enum class ZeusAttackMode : std::uint8_t {
+//        password_list,
+//        login_list,
+//        password_brute,
+//        password_reverse,
+//        password_null,
+//        password_same,
+//        colon_file,
+//    };
+//
+//    enum class ZeusOutputFormat {
+//        plain_text,
+//        jsonv1,
+//        jsonv2,
+//        xmlv1,
+//    };
 
     struct ZeusOptions {
         ZeusAttackMode mode{ZeusAttackMode::password_list};
@@ -50,7 +50,7 @@ namespace zeus
         bool try_password_reverse_login{false};
         bool exit_on_first_found{false};
         bool exit_on_first_found_global{false};
-        OutputFormat outfile_format{OutputFormat::plain_text};
+        ZeusOutputFormat outfile_format{ZeusOutputFormat::plain_text};
         std::optional<std::string> distributed; // "X/Y"
         std::optional<std::string> login, login_file;
         std::optional<std::string> password, password_file;
