@@ -10,6 +10,8 @@
 #include <string>
 #include <vector>
 
+#include <unistd.h>
+
 #include <boost/asio.hpp>
 #include <boost/asio/ssl.hpp>
 
@@ -150,13 +152,16 @@ namespace zeus
                 return proxies_.empty();
             }
 
-            [[nodiscard]]
-            const ZeusProxyConfig& pick_random() const;
+            // [[nodiscard]]
+            // const ZeusProxyConfig& pick_random() const;
 
             [[nodiscard]]
             const ZeusProxyConfig& pick_random() const
             {
                 ZEUS_EXPECTS(!proxies_.empty());
+                static thread_local std::mt19937 rng{std::random_device{}()};
+                std::uniform_int_distribution<std::size_t> dist(0, proxies_.size() - 1);
+                return proxies_[dist(rng)];
             }
 
         private:
@@ -326,20 +331,20 @@ namespace zeus
     class ZeusEngine final
     {
         public:
-            struct ZeusOptions {
-                ZeusLogLevel log_level{ZeusLogLevel::normal};
-                std::chrono::seconds connect_timeout{30};
-                std::uint16_t target_port{};
-                bool ssl{false};
-                std::optional<std::uint16_t> source_port;
-                int connect_retries{1};
-                bool do_retry{true};       // было: int32_t do_retry (hydra-mod.c)
-                bool old_ssl{false};       // было: int32_t old_ssl
-                bool colored_output{true}; // было: uint32_t colored_output
-                bool quiet{false};
-            };
+//            struct ZeusOptions {
+//                ZeusLogLevel log_level{ZeusLogLevel::normal};
+//                std::chrono::seconds connect_timeout{30};
+//                std::uint16_t target_port{};
+//                bool ssl{false};
+//                std::optional<std::uint16_t> source_port;
+//                int connect_retries{1};
+//                bool do_retry{true};       // было: int32_t do_retry (hydra-mod.c)
+//                bool old_ssl{false};       // было: int32_t old_ssl
+//                bool colored_output{true}; // было: uint32_t colored_output
+//                bool quiet{false};
+//            };
 
-            ZeusEngine(ZeusOptions opts, ZeusIpcChannel ipc, ZeusCompositeReportSink reporter): options_{opts}, logger_{opts.log_level}, ipc_{std::move(ipc)},reporter_{std::move(reporter)}
+            ZeusEngine(types::ZeusConnectOptions opts, ZeusIpcChannel ipc, ZeusCompositeReportSink reporter): options_{opts}, logger_{opts.log_level}, ipc_{std::move(ipc)},reporter_{std::move(reporter)}
             {
 
             }
@@ -351,7 +356,7 @@ namespace zeus
             }
 
             [[nodiscard]]
-            const ZeusOptions& options() const noexcept
+            const types::ZeusConnectOptions& options() const noexcept
             {
                 return options_;
             }
@@ -417,7 +422,7 @@ namespace zeus
             }
 
         private:
-            ZeusOptions options_;
+            types::ZeusConnectOptions options_;
             ZeusLogger logger_;
             asio::io_context io_;
             ZeusProxyPool proxies_;

@@ -52,7 +52,7 @@ namespace zeus
         }
         opts.ssl = vm["ssl"].as<bool>();
         opts.restore = vm["restore"].as<bool>();
-        opts.engine.log_level = vm["debug"].as<bool>() ? zeus::ZeusLogLevel::debug : vm["verbose"].as<bool>() ? zeus::ZeusLogLevel::verbose : zeus::ZeusLogLevel::normal;
+        opts.engine.log_level = vm["debug"].as<bool>() ? types::ZeusLogLevel::debug : vm["verbose"].as<bool>() ? types::ZeusLogLevel::verbose : types::ZeusLogLevel::normal;
         opts.engine.quiet = vm["quiet"].as<bool>();
         // ... остальное аналогично ...
         return opts;
@@ -69,6 +69,7 @@ namespace zeus
     std::optional<ZeusServiceDescriptor> ZeusServiceCatalog::find(std::string_view name) const
     {
         auto module = ZeusServicesRegistry::instance().create(name);
+
         if (!module)
         {
             return std::nullopt;
@@ -82,7 +83,7 @@ namespace zeus
     }
 
 // --------------------------------------------------------------- Scheduler --
-    ZeusScheduler::ZeusScheduler(ZeusOptions opts, std::vector<ZeusTarget> targets, ZeusCredentialSource creds) : opts_{std::move(opts)}, targets_{std::move(targets)}, creds_{std::move(creds)}
+    ZeusScheduler::ZeusScheduler(types::ZeusOptions opts, std::vector<types::ZeusTarget> targets, ZeusCredentialSource creds) : opts_{std::move(opts)}, targets_{std::move(targets)}, creds_{std::move(creds)}
     {
 
     }

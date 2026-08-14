@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <optional>
 
-namespace zeus
+namespace zeus::types
 {
     struct ZeusCredential {
         std::string login;
@@ -106,6 +106,87 @@ namespace zeus
         oracle,
         redis,
         memcached,
+    };
+
+    struct ZeusConnectOptions {
+        ZeusLogLevel log_level{ZeusLogLevel::normal};
+        std::chrono::seconds connect_timeout{30};
+        std::uint16_t target_port{};
+        bool ssl{false};
+        std::optional<std::uint16_t> source_port;
+        int connect_retries{1};
+        bool do_retry{true};
+        bool old_ssl{false};
+        bool colored_output{true};
+        bool quiet{false};
+    };
+
+    struct ZeusOptions {
+        ZeusAttackMode mode{ZeusAttackMode::password_list};
+        bool loop_users{false};
+        bool ssl{false};
+        bool restore{false};
+        ZeusEngine::Options engine{};
+        bool show_attempt{false};
+        int tasks{16};
+        int max_use{16};
+        bool try_null_password{false};
+        bool try_password_same_as_login{false};
+        bool try_password_reverse_login{false};
+        bool exit_on_first_found{false};
+        bool exit_on_first_found_global{false};
+        ZeusOutputFormat outfile_format{ZeusOutputFormat::plain_text};
+        std::optional<std::string> distributed; // "X/Y"
+        std::optional<std::string> login, login_file;
+        std::optional<std::string> password, password_file;
+        std::optional<std::filesystem::path> outfile;
+        std::optional<std::filesystem::path> targets_file; // -M
+        std::optional<std::filesystem::path> colon_file;   // -C
+        std::string misc_opts;
+        std::string server;
+        std::string service;
+        bool bruteforce{false}; // -x
+        bool skip_redo{false};  // -K
+    };
+
+    struct ZeusServiceDescriptor {
+        std::string name;
+        std::uint16_t default_port{};
+        std::uint16_t default_ssl_port{};
+    };
+
+    enum class ZeusTargetState {
+        active,
+        finished,
+        error,
+        unresolved,
+    };
+
+    struct ZeusTarget {
+        std::string host;
+        std::uint16_t port{};
+        std::string resolved_ip;
+        ZeusTargetState state{ZeusTargetState::active};
+        std::uint64_t login_index{}, pass_index{}, sent{};
+        int fail_count{};
+        std::vector<ZeusCredential> retry_queue; // было redo_login[]/redo_pass[]
+        std::vector<std::string> skip_logins;
+    };
+
+    enum class ZeusWorkerState {
+        disabled,
+        idle,
+        active,
+    };
+
+    enum class ZeusIsolation {
+        thread,
+        process,
+    };
+
+    struct ZeusNtlmResponse {
+        std::vector<std::byte> nt_response;
+        std::vector<std::byte> lm_response;
     };
 }
 

@@ -4,8 +4,8 @@
 #include <cctype>
 #include <random>
 
-
 #include "zeus_crypto.hh"
+
 
 namespace zeus::crypto
 {

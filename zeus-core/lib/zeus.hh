@@ -36,35 +36,36 @@ namespace zeus
 //        xmlv1,
 //    };
 
-    struct ZeusOptions {
-        ZeusAttackMode mode{ZeusAttackMode::password_list};
-        bool loop_users{false};
-        bool ssl{false};
-        bool restore{false};
-        ZeusEngine::Options engine{};
-        bool show_attempt{false};
-        int tasks{16};
-        int max_use{16};
-        bool try_null_password{false};
-        bool try_password_same_as_login{false};
-        bool try_password_reverse_login{false};
-        bool exit_on_first_found{false};
-        bool exit_on_first_found_global{false};
-        ZeusOutputFormat outfile_format{ZeusOutputFormat::plain_text};
-        std::optional<std::string> distributed; // "X/Y"
-        std::optional<std::string> login, login_file;
-        std::optional<std::string> password, password_file;
-        std::optional<std::filesystem::path> outfile;
-        std::optional<std::filesystem::path> targets_file; // -M
-        std::optional<std::filesystem::path> colon_file;   // -C
-        std::string misc_opts;
-        std::string server;
-        std::string service;
-        bool bruteforce{false}; // -x
-        bool skip_redo{false};  // -K
-    };
+//    struct ZeusOptions {
+//        ZeusAttackMode mode{ZeusAttackMode::password_list};
+//        bool loop_users{false};
+//        bool ssl{false};
+//        bool restore{false};
+//        ZeusEngine::Options engine{};
+//        bool show_attempt{false};
+//        int tasks{16};
+//        int max_use{16};
+//        bool try_null_password{false};
+//        bool try_password_same_as_login{false};
+//        bool try_password_reverse_login{false};
+//        bool exit_on_first_found{false};
+//        bool exit_on_first_found_global{false};
+//        ZeusOutputFormat outfile_format{ZeusOutputFormat::plain_text};
+//        std::optional<std::string> distributed; // "X/Y"
+//        std::optional<std::string> login, login_file;
+//        std::optional<std::string> password, password_file;
+//        std::optional<std::filesystem::path> outfile;
+//        std::optional<std::filesystem::path> targets_file; // -M
+//        std::optional<std::filesystem::path> colon_file;   // -C
+//        std::string misc_opts;
+//        std::string server;
+//        std::string service;
+//        bool bruteforce{false}; // -x
+//        bool skip_redo{false};  // -K
+//    };
 
     class ZeusEngine;
+    class ZeusRestoreSession final;
 
     class ZeusEngineExit final
     {
@@ -84,11 +85,11 @@ namespace zeus
             ZeusExitCode code_;
     };
 
-    struct ZeusServiceDescriptor {
-        std::string name;
-        std::uint16_t default_port{};
-        std::uint16_t default_ssl_port{};
-    };
+//    struct ZeusServiceDescriptor {
+//        std::string name;
+//        std::uint16_t default_port{};
+//        std::uint16_t default_ssl_port{};
+//    };
 
     class ZeusServices
     {
@@ -99,7 +100,7 @@ namespace zeus
             virtual std::string_view name() const noexcept = 0;
 
             [[nodiscard]]
-            virtual ZeusServiceDescriptor descriptor() const = 0;
+            virtual types::ZeusServiceDescriptor descriptor() const = 0;
 
             virtual void init(ZeusEngine&)
             {
@@ -162,7 +163,7 @@ namespace zeus
     {
         public:
             [[nodiscard]]
-            static ZeusOptions parse(int argc, char** argv);
+            static types::ZeusOptions parse(int argc, char** argv);
     };
 
     class ZeusServiceCatalog final
@@ -170,7 +171,7 @@ namespace zeus
         public:
             static ZeusServiceCatalog& instance();
             [[nodiscard]]
-            std::optional<ZeusServiceDescriptor> find(std::string_view name) const;
+            std::optional<types::ZeusServiceDescriptor> find(std::string_view name) const;
 
             [[nodiscard]]
             std::vector<std::string> all_names() const;
@@ -180,24 +181,24 @@ namespace zeus
             ZeusServiceCatalog();
     };
 
-    enum class ZeusTargetState {
-        active,
-        finished,
-        error,
-        unresolved,
-    };
+//    enum class ZeusTargetState {
+//        active,
+//        finished,
+//        error,
+//        unresolved,
+//    };
 
 /// Заменяет hydra_target.
-    struct ZeusTarget {
-        std::string host;
-        std::uint16_t port{};
-        std::string resolved_ip;
-        ZeusTargetState state{ZeusTargetState::active};
-        std::uint64_t login_index{}, pass_index{}, sent{};
-        int fail_count{};
-        std::vector<ZeusCredential> retry_queue; // было redo_login[]/redo_pass[]
-        std::vector<std::string> skip_logins;
-    };
+//    struct ZeusTarget {
+//        std::string host;
+//        std::uint16_t port{};
+//        std::string resolved_ip;
+//        ZeusTargetState state{ZeusTargetState::active};
+//        std::uint64_t login_index{}, pass_index{}, sent{};
+//        int fail_count{};
+//        std::vector<ZeusCredential> retry_queue; // было redo_login[]/redo_pass[]
+//        std::vector<std::string> skip_logins;
+//    };
 
 /// Строит список целей из "server", CIDR (192.168.0.0/24), файла -M, [ipv6].
 /// Заменяет ручной CIDR-цикл и парсинг -M в main().
@@ -205,7 +206,7 @@ namespace zeus
     {
         public:
             [[nodiscard]]
-            static std::vector<ZeusTarget> expand(const ZeusOptions& opts);
+            static std::vector<types::ZeusTarget> expand(const types::ZeusOptions& opts);
     };
 
 // ------------------------------------------------------------- Credential --
@@ -242,11 +243,11 @@ namespace zeus
     };
 
 // --------------------------------------------------------------- Worker/Scheduler --
-    enum class ZeusWorkerState {
-        disabled,
-        idle,
-        active,
-    };
+//    enum class ZeusWorkerState {
+//        disabled,
+//        idle,
+//        active,
+//    };
 
 /// Заменяет hydra_head + fork()/socketpair(). Один Worker = одна "голова"
 /// перебора для одной цели. По умолчанию — std::jthread (быстрее, легче),
@@ -254,19 +255,19 @@ namespace zeus
     class ZeusWorker final
     {
     public:
-        enum class ZeusIsolation {
-            thread,
-            process,
-        };
+//        enum class ZeusIsolation {
+//            thread,
+//            process,
+//        };
 
-        ZeusWorker(ZeusTarget& target, std::unique_ptr<Module> module, ZeusIsolation isolation);
+        ZeusWorker(types::ZeusTarget& target, std::unique_ptr<ZeusServices> services, types::ZeusIsolation isolation);
         ~ZeusWorker();
 
-        void start(ZeusCredentialSource& creds, ZeusEngine::Options opts);
+        void start(ZeusCredentialSource& creds, types::ZeusOptions opts);
         void request_stop();
 
         [[nodiscard]]
-        ZeusWorkerState state() const noexcept
+        types::ZeusWorkerState state() const noexcept
         {
             return state_;
         }
@@ -278,10 +279,10 @@ namespace zeus
         }
 
     private:
-        ZeusTarget* target_;
+        types::ZeusTarget* target_;
         std::unique_ptr<Module> module_;
-        ZeusIsolation isolation_;
-        std::atomic<ZeusWorkerState> state_{ZeusWorkerState::idle};
+        types::ZeusIsolation isolation_;
+        std::atomic<types::ZeusWorkerState> state_{types::ZeusWorkerState::idle};
         std::optional<ZeusCredential> last_pair_;
         std::jthread thread_;      // isolation == thread
         pid_t pid_{-1};            // isolation == process
@@ -294,7 +295,7 @@ namespace zeus
     class ZeusScheduler final
     {
         public:
-            ZeusScheduler(ZeusOptions opts, std::vector<ZeusTarget> targets, ZeusCredentialSource creds);
+            ZeusScheduler(types::ZeusOptions opts, std::vector<types::ZeusTarget> targets, ZeusCredentialSource creds);
             void run();                 // блокирующий главный цикл (было: while(1) в main())
 
             [[nodiscard]]
@@ -304,8 +305,8 @@ namespace zeus
             }
 
         private:
-            ZeusOptions opts_;
-            std::vector<ZeusTarget> targets_;
+            types::ZeusOptions opts_;
+            std::vector<types::ZeusTarget> targets_;
             ZeusCredentialSource creds_;
             std::vector<std::unique_ptr<ZeusWorker>> workers_;
             ZeusStatsBoard stats_;
@@ -358,13 +359,13 @@ namespace zeus
             static constexpr std::string_view kMagic = "ZEUS-RESTORE";
             static constexpr std::uint32_t kFormatVersion = 1;
 
-            void save(const std::filesystem::path& file, const ZeusOptions&,const std::vector<ZeusTarget>&, const ZeusStatsBoard&) const;
+            void save(const std::filesystem::path& file, const ZeusOptions&,const std::vector<types::ZeusTarget>&, const ZeusStatsBoard&) const;
 
             [[nodiscard]]
             static std::optional<ZeusRestoreSession> load(const std::filesystem::path& file);
 
             ZeusOptions options;
-            std::vector<ZeusTarget> targets;
+            std::vector<types::ZeusTarget> targets;
     };
 
     class ZeusSignalGuard final
@@ -384,7 +385,7 @@ namespace zeus
             int run(int argc, char** argv);
         private:
             void print_help(bool extended) const;   // было help(int32_t ext)
-            void print_module_usage(const Options&) const; // было module_usage()
+            void print_module_usage(const types::ZeusOptions&) const; // было module_usage()
     };
 }
 

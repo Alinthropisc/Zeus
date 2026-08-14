@@ -10,6 +10,9 @@
 #include <functional>
 
 #include "zeus_contract.hh"
+#include "zeus_types.hh"
+
+// using namespace zeus::types;
 
 
 namespace zeus::crypto
@@ -130,7 +133,8 @@ namespace zeus::crypto
     // ---- CRC32 (IEEE 802.3 / zlib polynomial) — replaces crc32.c ----
     // Free function on purpose: it's stateless per call, a class would just be
     // ceremony. Used by the checkpoint/resume integrity check.
-    [[nodiscard]] std::uint32_t crc32(std::span<const std::byte> data) noexcept;
+    [[nodiscard]]
+    std::uint32_t crc32(std::span<const std::byte> data) noexcept;
 
     // ---- DES, VNC flavour — replaces d3des.c ----
     // Standard FIPS 46-3 DES engine, verified against the classic all-zero-key
@@ -166,7 +170,7 @@ namespace zeus::crypto
             ZeusSha256Hasher& operator=(const ZeusSha256Hasher&) = delete;
 
             void update(std::span<const std::byte> data) override;
-            
+
             [[nodiscard]]
             std::vector<std::byte> finalize() override;
 
@@ -243,10 +247,10 @@ namespace zeus::crypto
     // ---- NTLMv2, per MS-NLMP 3.3.2 — replaces ntlm.c + hmacmd5.c ----
     // Structurally correct per spec, sizes verified. NOT yet checked against a
     // captured live NTLM handshake — do that before trusting it operationally.
-    struct ZeusNtlmResponse {
-        std::vector<std::byte> nt_response;
-        std::vector<std::byte> lm_response;
-    };
+//    struct ZeusNtlmResponse {
+//        std::vector<std::byte> nt_response;
+//        std::vector<std::byte> lm_response;
+//    };
 
     class ZeusNtlmAuthenticator final
     {
