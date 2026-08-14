@@ -79,10 +79,15 @@ namespace zeus::proto
             bool little_endian_;
     };
 
-    class ZeusProtocolService : public zeus::net::ZeusNetworkService
+    class ZeusProtocolService : public zeus::ZeusServices
     {
         public:
             using ZeusNetworkService::ZeusNetworkService;
+
+            explicit ZeusProtocolService(std::unique_ptr<zeus::net::ZeusRetryPolicy> retry, std::shared_ptr<zeus::net::ZeusRateLimiter> limiter = nullptr): connector_{std::move(retry), std::move(limiter)}
+            {
+
+            }
 
             /// Final Template Method — concrete protocols must NOT override this;
             /// they implement handshake()/authenticate() instead. This keeps the
@@ -121,6 +126,12 @@ namespace zeus::proto
             }
 
         protected:
+
+            [[nodiscard]]
+            virtual boost::asio::ip::address resolve_target(zeus::ZeusEngine& engine) const
+            {
+                return default_target_address(engine);
+            }
             /// Optional pre-auth exchange (banner read, STARTTLS, SNI, ...).
             /// Default: no-op — plenty of protocols authenticate immediately.
             virtual void handshake(zeus::ZeusEngine&, ZeusConnection&)
@@ -146,17 +157,19 @@ namespace zeus::proto
                 return "target";
             }
 
-            [[nodiscard]]
-            boost::asio::ip::address resolve_target(zeus::ZeusEngine& engine) const override
-            {
-                // Default: engine already knows the resolved target address;
-                // proxy-aware resolution happens inside Connection::connect_tcp.
-                return default_target_address(engine);
-            }
+//            [[nodiscard]]
+//            boost::asio::ip::address resolve_target(zeus::ZeusEngine& engine) const override
+//            {
+//                // Default: engine already knows the resolved target address;
+//                // proxy-aware resolution happens inside Connection::connect_tcp.
+//                return default_target_address(engine);
+//            }
 
         private:
             [[nodiscard]]
             static boost::asio::ip::address default_target_address(zeus::ZeusEngine&);
+
+            zeus::net::ZeusConnectionEstablisher connector_;
         };
 }
 

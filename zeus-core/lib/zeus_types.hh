@@ -1,5 +1,8 @@
 #pragma once
 
+#include <string>
+#include <cstdint>
+#include <optional>
 
 namespace zeus
 {

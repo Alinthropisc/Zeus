@@ -11,6 +11,8 @@
 
 namespace zeus::net
 {
+    class ZeusRateLimiter;
+
     class ZeusRetryPolicy
     {
         public:
@@ -20,6 +22,50 @@ namespace zeus::net
             virtual std::optional<std::chrono::milliseconds>
 
             next_delay(int attempt_no) const = 0;
+    };
+
+    class ZeusConnectionEstablisher final
+    {
+    public:
+        ZeusConnectionEstablisher(std::unique_ptr<ZeusRetryPolicy> retry, std::shared_ptr<ZeusRateLimiter> limiter = nullptr): retry_{std::move(retry)}, limiter_{std::move(limiter)}
+        {
+            ZEUS_EXPECTS(retry_ != nullptr);
+        }
+
+        [[nodiscard]]
+        std::unique_ptr<ZeusConnection> connect(zeus::ZeusEngine& engine,std::function<boost::asio::ip::address(zeus::ZeusEngine&)> resolve_target)
+        {
+            ZEUS_EXPECTS(retry_ != nullptr);
+            int attempt = 1;
+
+            for (;;)
+            {
+                if (limiter_)
+                {
+                    limiter_->acquire();
+                }
+                auto conn = engine.make_connection();
+                auto host = resolve_target(engine);
+                auto res = conn->connect_tcp(host, engine.options().target_port, engine.options().connect_timeout);
+
+                if (res)
+                { Z
+                EUS_ENSURES(conn != nullptr);
+                    return conn;
+                }
+                auto delay = retry_->next_delay(attempt++);
+
+                if (!delay)
+                {
+                    return nullptr;
+                }
+                std::this_thread::sleep_for(*delay);
+            }
+        }
+
+    private:
+        std::unique_ptr<ZeusRetryPolicy> retry_;
+        std::shared_ptr<ZeusRateLimiter> limiter_;
     };
 
     class ZeusFixedRetryPolicy final : public ZeusRetryPolicy
@@ -152,7 +198,7 @@ namespace zeus::net
 
     private:
         std::size_t max_size_;
-        std::deque<std::unique_ptr<Connection>> idle_;
+        std::deque<std::unique_ptr<ZeusConnection>> idle_;
         std::mutex mutex_;
     };
 
