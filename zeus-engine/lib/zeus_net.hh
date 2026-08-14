@@ -49,8 +49,8 @@ namespace zeus::net
                 auto res = conn->connect_tcp(host, engine.options().target_port, engine.options().connect_timeout);
 
                 if (res)
-                { Z
-                EUS_ENSURES(conn != nullptr);
+                {
+                    ZEUS_ENSURES(conn != nullptr);
                     return conn;
                 }
                 auto delay = retry_->next_delay(attempt++);
@@ -202,62 +202,62 @@ namespace zeus::net
         std::mutex mutex_;
     };
 
-    class ZeusNetworkService : public zeus::ZeusServices
-    {
-    public:
-        explicit ZeusNetworkService(std::unique_ptr<ZeusRetryPolicy> retry,std::shared_ptr<ZeusRateLimiter> limiter = nullptr): retry_{std::move(retry)}, limiter_{std::move(limiter)}
-        {
-            ZEUS_EXPECTS(retry_ != nullptr);
-        }
-
-        ~ZeusNetworkService() override = default;
-
-        /// Template Method: establishes a connection honouring retry policy
-        /// and rate limiting, then hands control to the protocol layer via
-        /// establish_hook(). Concrete NetworkModule users normally don't call
-        /// this directly — ProtocolModule::try_login() does, as the next
-        /// layer up in the hierarchy.
-        [[nodiscard]]
-        std::unique_ptr<ZeusConnection> connect_with_policy(zeus::ZeusEngine& engine)
-        {
-            ZEUS_EXPECTS(retry_ != nullptr);
-            int attempt = 1;
-
-            for (;;)
-            {
-                if (limiter_)
-                {
-                    limiter_->acquire();
-                }
-                auto conn = engine.make_connection();
-                auto host = resolve_target(engine);
-                auto res = conn->connect_tcp(host, engine.options().target_port,engine.options().connect_timeout);
-
-                if (res)
-                {
-                    ZEUS_ENSURES(conn != nullptr);
-                    return conn;
-                }
-                auto delay = retry_->next_delay(attempt++);
-
-                if (!delay)
-                {
-                    return nullptr; // give up, caller must exit_worker(no_connect)
-                }
-                std::this_thread::sleep_for(*delay);
-            }
-        }
-
-    protected:
-        /// Hook for subclasses to say "where do I connect to" — usually just
-        /// the target's resolved IP, but proxy-aware modules can override.
-        [[nodiscard]]
-        virtual boost::asio::ip::address resolve_target(zeus::ZeusEngine&) const = 0;
-
-    private:
-        std::unique_ptr<ZeusRetryPolicy> retry_;
-        std::shared_ptr<ZeusRateLimiter> limiter_;
-    };
+//    class ZeusNetworkService : public zeus::ZeusServices
+//    {
+//    public:
+//        explicit ZeusNetworkService(std::unique_ptr<ZeusRetryPolicy> retry,std::shared_ptr<ZeusRateLimiter> limiter = nullptr): retry_{std::move(retry)}, limiter_{std::move(limiter)}
+//        {
+//            ZEUS_EXPECTS(retry_ != nullptr);
+//        }
+//
+//        ~ZeusNetworkService() override = default;
+//
+//        /// Template Method: establishes a connection honouring retry policy
+//        /// and rate limiting, then hands control to the protocol layer via
+//        /// establish_hook(). Concrete NetworkModule users normally don't call
+//        /// this directly — ProtocolModule::try_login() does, as the next
+//        /// layer up in the hierarchy.
+//        [[nodiscard]]
+//        std::unique_ptr<ZeusConnection> connect_with_policy(zeus::ZeusEngine& engine)
+//        {
+//            ZEUS_EXPECTS(retry_ != nullptr);
+//            int attempt = 1;
+//
+//            for (;;)
+//            {
+//                if (limiter_)
+//                {
+//                    limiter_->acquire();
+//                }
+//                auto conn = engine.make_connection();
+//                auto host = resolve_target(engine);
+//                auto res = conn->connect_tcp(host, engine.options().target_port,engine.options().connect_timeout);
+//
+//                if (res)
+//                {
+//                    ZEUS_ENSURES(conn != nullptr);
+//                    return conn;
+//                }
+//                auto delay = retry_->next_delay(attempt++);
+//
+//                if (!delay)
+//                {
+//                    return nullptr; // give up, caller must exit_worker(no_connect)
+//                }
+//                std::this_thread::sleep_for(*delay);
+//            }
+//        }
+//
+//    protected:
+//        /// Hook for subclasses to say "where do I connect to" — usually just
+//        /// the target's resolved IP, but proxy-aware modules can override.
+//        [[nodiscard]]
+//        virtual boost::asio::ip::address resolve_target(zeus::ZeusEngine&) const = 0;
+//
+//    private:
+//        std::unique_ptr<ZeusRetryPolicy> retry_;
+//        std::shared_ptr<ZeusRateLimiter> limiter_;
+//    };
 }
 
 
