@@ -7,6 +7,7 @@
 #include <string>
 #include <string_view>
 #include <vector>
+#include <functional>
 
 #include "zeus_contract.hh"
 
@@ -154,6 +155,113 @@ namespace zeus::crypto
 
     [[nodiscard]]
     std::array<std::byte, 8> vnc_des_key_from_password(std::string_view password) noexcept;
+
+    // ---- SHA256 (OpenSSL EVP) ----
+    class ZeusSha256Hasher final : public ZeusHasher
+    {
+        public:
+            ZeusSha256Hasher();
+            ~ZeusSha256Hasher() override;
+            ZeusSha256Hasher(const ZeusSha256Hasher&) = delete;
+            ZeusSha256Hasher& operator=(const ZeusSha256Hasher&) = delete;
+
+            void update(std::span<const std::byte> data) override;
+            
+            [[nodiscard]]
+            std::vector<std::byte> finalize() override;
+
+            [[nodiscard]]
+            std::size_t digest_size() const noexcept override
+            {
+                return 32;
+            }
+
+            [[nodiscard]]
+            std::size_t block_size() const noexcept override
+            {
+                return 64;
+            }
+
+            [[nodiscard]]
+            std::unique_ptr<ZeusHasher> clone_empty() const override;
+
+        private:
+            struct Impl;
+            std::unique_ptr<Impl> impl_;
+    };
+
+    // ---- PBKDF2-HMAC (RFC 8018), generic over any ZeusHasher via a factory ----
+    [[nodiscard]]
+    std::vector<std::byte> pbkdf2_hmac(const std::function<std::unique_ptr<ZeusHasher>()>& hasher_factory,std::span<const std::byte> password,std::span<const std::byte> salt,std::uint32_t iterations,std::size_t dk_len);
+
+    // ---- SASL, Strategy + Factory Method — replaces sasl.c ----
+    class ZeusSaslExchange
+    {
+        public:
+            virtual ~ZeusSaslExchange() = default;
+
+            [[nodiscard]]
+            virtual std::string client_first_message() = 0;
+
+            [[nodiscard]]
+            virtual std::string client_final_message(std::string_view server_first) = 0;
+
+            [[nodiscard]]
+            virtual bool verify_server_signature(std::string_view server_final) = 0;
+    };
+
+    // Verified end-to-end against the official RFC 7677 example (user/pencil):
+    // ClientProof and ServerSignature both matched byte-for-byte.
+    class ZeusScramSha256Exchange final : public ZeusSaslExchange
+    {
+        public:
+            ZeusScramSha256Exchange(std::string_view username, std::string_view password);
+
+            [[nodiscard]]
+            std::string client_first_message() override;
+
+            [[nodiscard]]
+            std::string client_final_message(std::string_view server_first) override;
+
+            [[nodiscard]]
+            bool verify_server_signature(std::string_view server_final) override;
+
+        private:
+            std::string username_, password_, client_nonce_;
+            std::string client_first_bare_;
+            std::string auth_message_;
+            std::vector<std::byte> salted_password_;
+    };
+
+    class ZeusSaslExchangeFactory
+    {
+        public:
+            [[nodiscard]]
+            static std::unique_ptr<ZeusSaslExchange> create(std::string_view mechanism,std::string_view user, std::string_view password);
+    };
+
+    // ---- NTLMv2, per MS-NLMP 3.3.2 — replaces ntlm.c + hmacmd5.c ----
+    // Structurally correct per spec, sizes verified. NOT yet checked against a
+    // captured live NTLM handshake — do that before trusting it operationally.
+    struct ZeusNtlmResponse {
+        std::vector<std::byte> nt_response;
+        std::vector<std::byte> lm_response;
+    };
+
+    class ZeusNtlmAuthenticator final
+    {
+        public:
+            ZeusNtlmAuthenticator(std::string_view username, std::string_view domain, std::string_view password);
+
+            [[nodiscard]]
+            ZeusNtlmResponse compute_ntlmv2(std::span<const std::byte, 8> server_challenge,std::span<const std::byte, 8> client_challenge,std::uint64_t time_filetime_le,std::span<const std::byte> server_name_avpairs) const;
+
+        private:
+            [[nodiscard]]
+            std::vector<std::byte> ntowfv2() const;
+
+            std::string username_, domain_, password_;
+    };
 }
 
 

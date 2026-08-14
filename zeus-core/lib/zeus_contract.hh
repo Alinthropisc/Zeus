@@ -18,13 +18,13 @@ namespace zeus::contract
     class ZeusViolationError final : public std::logic_error
     {
         public:
-            ZeusViolationError(ZeusKind kind, const char* expr, std::source_location loc): std::logic_error(std::format("[{}] contract violated: `{}` at {}:{} in {}()",kind_name(kind), expr, loc.file_name(),loc.line(), loc.function_name())),kind_{kind}
+            ZeusViolationError(zeus::ZeusKind kind, const char* expr, std::source_location loc): std::logic_error(std::format("[{}] contract violated: `{}` at {}:{} in {}()",kind_name(kind), expr, loc.file_name(),loc.line(), loc.function_name())),kind_{kind}
             {
 
             }
 
             [[nodiscard]]
-            ZeusKind kind() const noexcept
+            zeus::ZeusKind kind() const noexcept
             {
                 return kind_;
             }
@@ -50,7 +50,7 @@ namespace zeus::contract
     };
 
     [[noreturn]]
-    inline void fail(ZeusKind kind, const char* expr,std::source_location loc = std::source_location::current())
+    inline void fail(zeus::ZeusKind kind, const char* expr,std::source_location loc = std::source_location::current())
     {
         throw ZeusViolationError(kind, expr, loc);
     }
@@ -86,9 +86,9 @@ namespace zeus::contract
 #define ZEUS_ENSURES(cond) ((void)0)
 #define ZEUS_INVARIANT(cond) ((void)0)
 #else
-#define ZEUS_EXPECTS(cond) ((cond) ? (void)0 : ::zeus::contract::fail(::zeus::contract::ZeusKind::precondition, #cond))
-#define ZEUS_ENSURES(cond) ((cond) ? (void)0 : ::zeus::contract::fail(::zeus::contract::ZeusKind::postcondition, #cond))
-#define ZEUS_INVARIANT(cond) ((cond) ? (void)0 : ::zeus::contract::fail(::zeus::contract::ZeusKind::invariant, #cond))
+#define ZEUS_EXPECTS(cond) ((cond) ? (void)0 : ::zeus::contract::fail(::zeus::ZeusKind::precondition, #cond))
+#define ZEUS_ENSURES(cond) ((cond) ? (void)0 : ::zeus::contract::fail(::zeus::ZeusKind::postcondition, #cond))
+#define ZEUS_INVARIANT(cond) ((cond) ? (void)0 : ::zeus::contract::fail(::zeus::ZeusKind::invariant, #cond))
 #endif
 
 

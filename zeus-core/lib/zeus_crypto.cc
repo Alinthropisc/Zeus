@@ -1,5 +1,9 @@
 #include <cstring>
 #include <openssl/evp.h>
+#include <algorithm>
+#include <cctype>
+#include <random>
+
 
 #include "zeus_crypto.hh"
 
@@ -404,6 +408,351 @@ namespace zeus::crypto
             key[i] = static_cast<std::byte>(rev);
         }
         return key;
+    }
+
+
+    struct ZeusSha256Hasher::Impl {
+        EVP_MD_CTX* ctx{nullptr};
+    };
+
+    ZeusSha256Hasher::ZeusSha256Hasher() : impl_{std::make_unique<Impl>()}
+    {
+        impl_->ctx = EVP_MD_CTX_new();
+        ZEUS_EXPECTS(impl_->ctx != nullptr);
+        EVP_DigestInit_ex(impl_->ctx, EVP_sha256(), nullptr);
+    }
+
+    ZeusSha256Hasher::~ZeusSha256Hasher()
+    {
+        if (impl_ && impl_->ctx)
+        {
+            EVP_MD_CTX_free(impl_->ctx);
+        }
+    }
+
+    void ZeusSha256Hasher::update(std::span<const std::byte> data)
+    {
+        EVP_DigestUpdate(impl_->ctx, data.data(), data.size());
+    }
+
+    std::vector<std::byte> ZeusSha256Hasher::finalize()
+    {
+        std::vector<std::byte> out(EVP_MAX_MD_SIZE);
+        unsigned int len = 0;
+        EVP_DigestFinal_ex(impl_->ctx, reinterpret_cast<unsigned char*>(out.data()), &len);
+        out.resize(len);
+        ZEUS_ENSURES(out.size() == digest_size());
+        return out;
+    }
+    std::unique_ptr<ZeusHasher> ZeusSha256Hasher::clone_empty() const
+    {
+        return std::make_unique<ZeusSha256Hasher>();
+    }
+
+    // ============================== PBKDF2 ==============================
+    std::vector<std::byte> pbkdf2_hmac(const std::function<std::unique_ptr<ZeusHasher>()>& hasher_factory,std::span<const std::byte> password, std::span<const std::byte> salt,std::uint32_t iterations, std::size_t dk_len)
+    {
+        ZEUS_EXPECTS(iterations > 0);
+        std::vector<std::byte> dk;
+        dk.reserve(dk_len + 64);
+        std::uint32_t block_index = 1;
+
+        while (dk.size() < dk_len)
+        {
+            std::vector<std::byte> block_input(salt.begin(), salt.end());
+
+            for (int i = 3; i >= 0; --i)
+            {
+                block_input.push_back(static_cast<std::byte>((block_index >> (8 * i)) & 0xFF));
+            }
+            ZeusHmac hmac1(hasher_factory(), password);
+            hmac1.update(block_input);
+            auto u = hmac1.finalize();
+            auto t = u;
+
+            for (std::uint32_t iter = 1; iter < iterations; ++iter)
+            {
+                ZeusHmac hmac_i(hasher_factory(), password);
+                hmac_i.update(u);
+                u = hmac_i.finalize();
+
+                for (std::size_t i = 0; i < t.size(); ++i)
+                {
+                    t[i] ^= u[i];
+                }
+            }
+            dk.insert(dk.end(), t.begin(), t.end());
+            ++block_index;
+        }
+        dk.resize(dk_len);
+        return dk;
+    }
+
+    // ============================== SCRAM-SHA-256 ==============================
+    namespace
+    {
+        std::vector<std::byte> to_bytes(std::string_view s)
+        {
+            return {reinterpret_cast<const std::byte*>(s.data()), reinterpret_cast<const std::byte*>(s.data() + s.size())};
+        }
+
+        std::string generate_client_nonce()
+        {
+            static constexpr char alphabet[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+            std::random_device rd;
+            std::mt19937_64 gen(rd());
+            std::uniform_int_distribution<int> dist(0, 61);
+            std::string s(24, ' ');
+
+            for (auto& c : s)
+            {
+                c = alphabet[dist(gen)];
+            }
+            return s;
+        }
+
+        std::string b64encode(std::span<const std::byte> data)
+        {
+            static const char* tbl = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+            std::string out;
+            std::size_t i = 0;
+
+            while (i + 3 <= data.size())
+            {
+                const unsigned v = (static_cast<unsigned char>(data[i]) << 16) | (static_cast<unsigned char>(data[i + 1]) << 8) | static_cast<unsigned char>(data[i + 2]);
+                out += tbl[(v >> 18) & 0x3F]; out += tbl[(v >> 12) & 0x3F]; out += tbl[(v >> 6) & 0x3F]; out += tbl[v & 0x3F];
+                i += 3;
+            }
+            const std::size_t rem = data.size() - i;
+
+            if (rem == 1)
+            {
+                const unsigned v = static_cast<unsigned char>(data[i]) << 16;
+                out += tbl[(v >> 18) & 0x3F]; out += tbl[(v >> 12) & 0x3F]; out += "==";
+            }
+            else if (rem == 2)
+            {
+                const unsigned v = (static_cast<unsigned char>(data[i]) << 16) | (static_cast<unsigned char>(data[i + 1]) << 8);
+                out += tbl[(v >> 18) & 0x3F]; out += tbl[(v >> 12) & 0x3F]; out += tbl[(v >> 6) & 0x3F]; out += "=";
+            }
+            return out;
+        }
+
+        std::vector<std::byte> b64decode(std::string_view s)
+        {
+            auto val = [](char c) -> int
+            {
+                if (c >= 'A' && c <= 'Z')
+                {
+                    return c - 'A';
+                }
+
+                if (c >= 'a' && c <= 'z')
+                {
+                    return c - 'a' + 26;
+                }
+
+                if (c >= '0' && c <= '9')
+                {
+                    return c - '0' + 52;
+                }
+
+                if (c == '+')
+                {
+                    return 62;
+                }
+
+                if (c == '/')
+                {
+                    return 63;
+                }
+                return -1;
+            };
+            std::vector<std::byte> out;
+            int buf = 0, bits = 0;
+
+            for (char c : s)
+            {
+                if (c == '=')
+                {
+                    break;
+                }
+                const int v = val(c);
+
+                if (v < 0)
+                {
+                    continue;
+                }
+                buf = (buf << 6) | v; bits += 6;
+
+                if (bits >= 8)
+                {
+                    bits -= 8; out.push_back(static_cast<std::byte>((buf >> bits) & 0xFF));
+                }
+            }
+            return out;
+        }
+
+        std::string find_field(std::string_view msg, char key)
+        {
+            std::size_t pos = 0;
+
+            while (pos < msg.size())
+            {
+                const std::size_t comma = msg.find(',', pos);
+                const std::string_view field = msg.substr(pos, comma == std::string_view::npos ? std::string_view::npos : comma - pos);
+
+                if (field.size() >= 2 && field[0] == key && field[1] == '=')
+                {
+                    return std::string(field.substr(2));
+                }
+
+                if (comma == std::string_view::npos)
+                {
+                    break;
+                }
+                pos = comma + 1;
+            }
+            return {};
+        }
+    }
+
+    ZeusScramSha256Exchange::ZeusScramSha256Exchange(std::string_view username, std::string_view password): username_{username}, password_{password}, client_nonce_{generate_client_nonce()}
+    {
+
+    }
+
+    std::string ZeusScramSha256Exchange::client_first_message()
+    {
+        client_first_bare_ = "n=" + username_ + ",r=" + client_nonce_;
+        return "n,," + client_first_bare_;
+    }
+
+    std::string ZeusScramSha256Exchange::client_final_message(std::string_view server_first)
+    {
+        const std::string full_nonce = find_field(server_first, 'r');
+        const std::string salt_b64 = find_field(server_first, 's');
+        const std::uint32_t iterations = static_cast<std::uint32_t>(std::stoul(find_field(server_first, 'i')));
+        ZEUS_EXPECTS(full_nonce.starts_with(client_nonce_));
+        const auto salt = b64decode(salt_b64);
+
+        auto factory = []{
+            return std::unique_ptr<ZeusHasher>(std::make_unique<ZeusSha256Hasher>());
+        };
+        salted_password_ = pbkdf2_hmac(factory, to_bytes(password_), salt, iterations, 32);
+        ZeusHmac hmac_ck(factory(), salted_password_);
+        hmac_ck.update(to_bytes("Client Key"));
+        const auto client_key = hmac_ck.finalize();
+        ZeusSha256Hasher stored_hasher;
+        stored_hasher.update(client_key);
+        const auto stored_key = stored_hasher.finalize();
+        const std::string client_final_without_proof = "c=biws,r=" + full_nonce;
+        auth_message_ = client_first_bare_ + "," + std::string(server_first) + "," + client_final_without_proof;
+        ZeusHmac hmac_cs(factory(), stored_key);
+        hmac_cs.update(to_bytes(auth_message_));
+        const auto client_signature = hmac_cs.finalize();
+        std::vector<std::byte> client_proof(client_key.size());
+
+        for (std::size_t i = 0; i < client_key.size(); ++i)
+        {
+            client_proof[i] = client_key[i] ^ client_signature[i];
+        }
+        return client_final_without_proof + ",p=" + b64encode(client_proof);
+    }
+
+    bool ZeusScramSha256Exchange::verify_server_signature(std::string_view server_final)
+    {
+        const std::string sig_b64 = find_field(server_final, 'v');
+
+        auto factory = [] {
+            return std::unique_ptr<ZeusHasher>(std::make_unique<ZeusSha256Hasher>());
+        };
+        ZeusHmac hmac_sk(factory(), salted_password_);
+        hmac_sk.update(to_bytes("Server Key"));
+        const auto server_key = hmac_sk.finalize();
+        ZeusHmac hmac_ss(factory(), server_key);
+        hmac_ss.update(to_bytes(auth_message_));
+        const auto expected = hmac_ss.finalize();
+        return b64encode(expected) == sig_b64;
+    }
+
+    std::unique_ptr<ZeusSaslExchange> ZeusSaslExchangeFactory::create(std::string_view mechanism,std::string_view user, std::string_view password)
+    {
+        if (mechanism == "SCRAM-SHA-256")
+        {
+            return std::make_unique<ZeusScramSha256Exchange>(user, password);
+        }
+        ZEUS_EXPECTS(false && "unknown SASL mechanism");
+        return nullptr;
+    }
+
+    // ============================== NTLMv2 ==============================
+    namespace
+    {
+        std::vector<std::byte> utf16le(std::string_view s)
+        {
+            std::vector<std::byte> out;
+            out.reserve(s.size() * 2);
+            for (unsigned char c : s) { out.push_back(static_cast<std::byte>(c)); out.push_back(std::byte{0}); }
+            return out;
+        }
+        std::string to_upper_ascii(std::string_view s)
+        {
+            std::string out(s);
+
+            std::transform(out.begin(), out.end(), out.begin(), [](unsigned char c) {
+                return static_cast<char>(std::toupper(c));
+            });
+            return out;
+        }
+    }
+
+    ZeusNtlmAuthenticator::ZeusNtlmAuthenticator(std::string_view username, std::string_view domain, std::string_view password): username_{username}, domain_{domain}, password_{password}
+    {
+
+    }
+
+    std::vector<std::byte> ZeusNtlmAuthenticator::ntowfv2() const
+    {
+        ZeusMd4Hasher md4;
+        auto pw16 = utf16le(password_);
+        md4.update(pw16);
+        auto nt_hash = md4.finalize();
+        ZeusHmac hmac(std::make_unique<ZeusMd5Hasher>(), nt_hash);
+        auto ident = utf16le(to_upper_ascii(username_) + domain_);
+        hmac.update(ident);
+        return hmac.finalize();
+    }
+
+    ZeusNtlmResponse ZeusNtlmAuthenticator::compute_ntlmv2(std::span<const std::byte, 8> server_challenge,std::span<const std::byte, 8> client_challenge,std::uint64_t time_filetime_le,std::span<const std::byte> server_name_avpairs) const
+    {
+        const auto response_key = ntowfv2();
+        std::vector<std::byte> temp;
+        temp.push_back(std::byte{0x01});
+        temp.push_back(std::byte{0x01});
+        temp.insert(temp.end(), 6, std::byte{0});
+
+        for (int i = 0; i < 8; ++i)
+        {
+            temp.push_back(static_cast<std::byte>((time_filetime_le >> (8 * i)) & 0xFF));
+        }
+        temp.insert(temp.end(), client_challenge.begin(), client_challenge.end());
+        temp.insert(temp.end(), 4, std::byte{0});
+        temp.insert(temp.end(), server_name_avpairs.begin(), server_name_avpairs.end());
+        temp.insert(temp.end(), 4, std::byte{0});
+        std::vector<std::byte> nt_proof_input(server_challenge.begin(), server_challenge.end());
+        nt_proof_input.insert(nt_proof_input.end(), temp.begin(), temp.end());
+        ZeusHmac hmac_nt(std::make_unique<ZeusMd5Hasher>(), response_key);
+        hmac_nt.update(nt_proof_input);
+        auto nt_response = hmac_nt.finalize();
+        nt_response.insert(nt_response.end(), temp.begin(), temp.end());
+        std::vector<std::byte> lm_input(server_challenge.begin(), server_challenge.end());
+        lm_input.insert(lm_input.end(), client_challenge.begin(), client_challenge.end());
+        ZeusHmac hmac_lm(std::make_unique<ZeusMd5Hasher>(), response_key);
+        hmac_lm.update(lm_input);
+        auto lm_response = hmac_lm.finalize();
+        lm_response.insert(lm_response.end(), client_challenge.begin(), client_challenge.end());
+        return {std::move(nt_response), std::move(lm_response)};
     }
 }
 
