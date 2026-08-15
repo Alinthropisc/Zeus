@@ -1,12 +1,21 @@
 #pragma once
 
 #include <cstdint>
+#include <atomic>
 #include <expected>
 #include <functional>
 #include <memory>
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <filesystem>
+#include <generator>
+#include <optional>
+#include <ostream>
+#include <thread>
+#include <vector>
+
+#include "zeus_types.hh"
 
 
 namespace zeus
@@ -65,7 +74,7 @@ namespace zeus
 //    };
 
     class ZeusEngine;
-    class ZeusRestoreSession final;
+    class ZeusRestoreSession;
 
     class ZeusEngineExit final
     {
@@ -249,6 +258,42 @@ namespace zeus
 //        active,
 //    };
 
+    // ----------------------------------------------------------------- StatsBoard --
+/// Заменяет hydra_brain. Observer: воркеры дергают методы, UI/лог подписан.
+    class ZeusStatsBoard final
+    {
+        public:
+            void on_attempt() noexcept
+            {
+                ++sent_;
+            }
+
+            void on_found() noexcept
+            {
+                ++found_;
+            }
+
+            void on_target_finished() noexcept
+            {
+                ++finished_targets_;
+            }
+
+            [[nodiscard]]
+            std::uint64_t sent() const noexcept
+            {
+                return sent_;
+            }
+
+            [[nodiscard]]
+            std::uint64_t found() const noexcept
+            {
+                return found_;
+            }
+
+        private:
+            std::atomic<std::uint64_t> sent_{}, found_{}, finished_targets_{};
+    };
+
 /// Заменяет hydra_head + fork()/socketpair(). Один Worker = одна "голова"
 /// перебора для одной цели. По умолчанию — std::jthread (быстрее, легче),
 /// опционально — изолированный процесс (для хрупких библиотек типа libssh).
@@ -311,42 +356,6 @@ namespace zeus
             std::vector<std::unique_ptr<ZeusWorker>> workers_;
             ZeusStatsBoard stats_;
             ZeusRestoreSession restore_;
-    };
-
-// ----------------------------------------------------------------- StatsBoard --
-/// Заменяет hydra_brain. Observer: воркеры дергают методы, UI/лог подписан.
-    class ZeusStatsBoard final
-    {
-        public:
-            void on_attempt() noexcept
-            {
-                ++sent_;
-            }
-
-            void on_found() noexcept
-            {
-                ++found_;
-            }
-
-            void on_target_finished() noexcept
-            {
-                ++finished_targets_;
-            }
-
-            [[nodiscard]]
-            std::uint64_t sent() const noexcept
-            {
-                return sent_;
-            }
-
-            [[nodiscard]]
-            std::uint64_t found() const noexcept
-            {
-                return found_;
-            }
-
-        private:
-            std::atomic<std::uint64_t> sent_{}, found_{}, finished_targets_{};
     };
 
 // -------------------------------------------------------------- RestoreSession --

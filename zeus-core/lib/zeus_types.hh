@@ -3,6 +3,10 @@
 #include <string>
 #include <cstdint>
 #include <optional>
+#include <chrono>
+#include <filesystem>
+#include <vector>
+#include <cstddef>
 
 namespace zeus::types
 {

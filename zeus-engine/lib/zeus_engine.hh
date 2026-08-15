@@ -8,6 +8,7 @@
 #include <optional>
 #include <span>
 #include <string>
+#include <random>
 #include <vector>
 
 #include <unistd.h>
@@ -17,6 +18,7 @@
 
 #include "../../zeus-core/lib/zeus.hh"
 #include "../../zeus-core/lib/zeus_types.hh"
+#include "../../zeus-core/lib/zeus_contract.hh"
 
 
 namespace zeus
@@ -47,7 +49,7 @@ namespace zeus
 
             template<typename... A> void debug(std::format_string<A...> fmt, A&&... a) const
             {
-                if (is_debug())
+                if (this->is_debug())
                 {
                     emit(stdout, "[ ETA ]: DEBUG ", fmt, std::forward<A>(a)...);
                 }
@@ -55,7 +57,7 @@ namespace zeus
 
             template<typename... A> void verbose(std::format_string<A...> fmt, A&&... a) const
             {
-                if (is_verbose())
+                if (this->is_verbose())
                 {
                     emit(stderr, "[ ETA ]: VERBOSE ", fmt, std::forward<A>(a)...);
                 }

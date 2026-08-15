@@ -24,48 +24,86 @@ namespace zeus::net
             next_delay(int attempt_no) const = 0;
     };
 
+    class ZeusRateLimiter final
+    {
+        public:
+            ZeusRateLimiter(double rate_per_sec, std::size_t burst): rate_{rate_per_sec}, capacity_{static_cast<double>(burst)}, tokens_{static_cast<double>(burst)},last_refill_{Clock::now()}
+            {
+                ZEUS_EXPECTS(rate_per_sec > 0.0);
+                ZEUS_EXPECTS(burst >= 1);
+            }
+
+            void acquire()
+            {
+                std::scoped_lock lock{mutex_};
+                refill_locked();
+
+                while (tokens_ < 1.0)
+                {
+                    auto wait = std::chrono::duration<double>((1.0 - tokens_) / rate_);
+                    std::this_thread::sleep_for(std::chrono::duration_cast<std::chrono::milliseconds>(wait));
+                    refill_locked();
+                }
+                tokens_ -= 1.0;
+                ZEUS_ENSURES(tokens_ >= 0.0);
+            }
+
+        private:
+            void refill_locked()
+            {
+                auto now = Clock::now();
+                double elapsed = std::chrono::duration<double>(now - last_refill_).count();
+                tokens_ = std::min(capacity_, tokens_ + elapsed * rate_);
+                last_refill_ = now;
+            }
+            using Clock = std::chrono::steady_clock;
+            double rate_, capacity_, tokens_;
+            Clock::time_point last_refill_;
+            std::mutex mutex_;
+    };
+
     class ZeusConnectionEstablisher final
     {
-    public:
-        ZeusConnectionEstablisher(std::unique_ptr<ZeusRetryPolicy> retry, std::shared_ptr<ZeusRateLimiter> limiter = nullptr): retry_{std::move(retry)}, limiter_{std::move(limiter)}
-        {
-            ZEUS_EXPECTS(retry_ != nullptr);
-        }
-
-        [[nodiscard]]
-        std::unique_ptr<ZeusConnection> connect(zeus::ZeusEngine& engine,std::function<boost::asio::ip::address(zeus::ZeusEngine&)> resolve_target)
-        {
-            ZEUS_EXPECTS(retry_ != nullptr);
-            int attempt = 1;
-
-            for (;;)
+        public:
+            ZeusConnectionEstablisher(std::unique_ptr<ZeusRetryPolicy> retry, std::shared_ptr<ZeusRateLimiter> limiter = nullptr): retry_{std::move(retry)}, limiter_{std::move(limiter)}
             {
-                if (limiter_)
-                {
-                    limiter_->acquire();
-                }
-                auto conn = engine.make_connection();
-                auto host = resolve_target(engine);
-                auto res = conn->connect_tcp(host, engine.options().target_port, engine.options().connect_timeout);
-
-                if (res)
-                {
-                    ZEUS_ENSURES(conn != nullptr);
-                    return conn;
-                }
-                auto delay = retry_->next_delay(attempt++);
-
-                if (!delay)
-                {
-                    return nullptr;
-                }
-                std::this_thread::sleep_for(*delay);
+                ZEUS_EXPECTS(retry_ != nullptr);
             }
-        }
 
-    private:
-        std::unique_ptr<ZeusRetryPolicy> retry_;
-        std::shared_ptr<ZeusRateLimiter> limiter_;
+            [[nodiscard]]
+            std::unique_ptr<ZeusConnection> connect(zeus::ZeusEngine& engine,std::function<boost::asio::ip::address(zeus::ZeusEngine&)> resolve_target)
+            {
+                ZEUS_EXPECTS(retry_ != nullptr);
+                int attempt = 1;
+
+                for (;;)
+                {
+                    if (limiter_)
+                    {
+                        limiter_->acquire();
+                    }
+                    auto conn = engine.make_connection();
+                    auto host = resolve_target(engine);
+                    auto res = conn->connect_tcp(host, engine.options().target_port, engine.options().connect_timeout);
+
+                    if (res)
+                    {
+                        ZEUS_ENSURES(conn != nullptr);
+                        return conn;
+                    }
+                    auto delay = retry_->next_delay(attempt++);
+
+                    if (!delay)
+                    {
+                        return nullptr;
+                    }
+                    std::this_thread::sleep_for(*delay);
+                }
+            }
+
+        private:
+            std::unique_ptr<ZeusRetryPolicy> retry_;
+            std::shared_ptr<ZeusRateLimiter> limiter_;
     };
 
     class ZeusFixedRetryPolicy final : public ZeusRetryPolicy
@@ -120,43 +158,7 @@ namespace zeus::net
             std::chrono::milliseconds base_, cap_;
     };
 
-    class ZeusRateLimiter final
-    {
-        public:
-            ZeusRateLimiter(double rate_per_sec, std::size_t burst): rate_{rate_per_sec}, capacity_{static_cast<double>(burst)}, tokens_{static_cast<double>(burst)},last_refill_{Clock::now()}
-            {
-                ZEUS_EXPECTS(rate_per_sec > 0.0);
-                ZEUS_EXPECTS(burst >= 1);
-            }
 
-            void acquire()
-            {
-                std::scoped_lock lock{mutex_};
-                refill_locked();
-
-                while (tokens_ < 1.0)
-                {
-                    auto wait = std::chrono::duration<double>((1.0 - tokens_) / rate_);
-                    std::this_thread::sleep_for(std::chrono::duration_cast<std::chrono::milliseconds>(wait));
-                    refill_locked();
-                }
-                tokens_ -= 1.0;
-                ZEUS_ENSURES(tokens_ >= 0.0);
-            }
-
-        private:
-            void refill_locked()
-            {
-                auto now = Clock::now();
-                double elapsed = std::chrono::duration<double>(now - last_refill_).count();
-                tokens_ = std::min(capacity_, tokens_ + elapsed * rate_);
-                last_refill_ = now;
-            }
-            using Clock = std::chrono::steady_clock;
-            double rate_, capacity_, tokens_;
-            Clock::time_point last_refill_;
-            std::mutex mutex_;
-    };
 
     class ZeusConnectionPool final
     {
