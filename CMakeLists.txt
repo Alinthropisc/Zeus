@@ -34,22 +34,6 @@ add_executable(zeus main.cpp
         zeus-engine/lib/zeus_net.cc
         zeus-engine/lib/zeus_net.hh
         zeus-core/lib/zeus_transport.hh
-        zeus-core/lib/bfg.c
-        zeus-core/lib/bfg.h
-        zeus-core/lib/crc32.c
-        zeus-core/lib/crc32.h
-        zeus-core/lib/d3des.c
-        zeus-core/lib/d3des.h
-        zeus-core/lib/hmacmd5.c
-        zeus-core/lib/hmacmd5.h
-        zeus-core/lib/libpq-fe.h
-        zeus-core/lib/ntlm.c
-        zeus-core/lib/ntlm.h
-        zeus-core/lib/performance.h
-        zeus-core/lib/postgres_ext.h
-        zeus-core/lib/pw-inspector.c
-        zeus-core/lib/sasl.c
-        zeus-core/lib/sasl.h
         zeus-core/lib/zeus_types.hh
         zeus-core/lib/zeus_crypto.cc
         zeus-core/lib/zeus_crypto.hh)

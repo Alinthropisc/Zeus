@@ -192,6 +192,31 @@ namespace zeus::types
 
 
 
+namespace zeus
+{
+    using types::ZeusCredential;
+    using types::ZeusExitCode;
+    using types::ZeusAttackMode;
+    using types::ZeusOutputFormat;
+    using types::ZeusKind;
+    using types::ZeusConnectError;
+    using types::ZeusLogLevel;
+    using types::ZeusProxyType;
+    using types::ZeusProxyConfig;
+    using types::ZeusProxyError;
+    using types::ZeusFinding;
+    using types::ZeusTransportError;
+    using types::ZeusAuthResult;
+    using types::ZeusDbDialect;
+    using types::ZeusConnectOptions;
+    using types::ZeusOptions;
+    using types::ZeusServiceDescriptor;
+    using types::ZeusTargetState;
+    using types::ZeusTarget;
+    using types::ZeusWorkerState;
+    using types::ZeusIsolation;
+    using types::ZeusNtlmResponse;
+}
 
 
 

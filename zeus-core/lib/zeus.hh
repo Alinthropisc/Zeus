@@ -163,7 +163,7 @@ namespace zeus
     {
         public:
             [[nodiscard]]
-            static types::ZeusOptions parse(int argc, char** argv);
+            static zeus::types::ZeusOptions parse(int argc, char** argv);
     };
 
     class ZeusServiceCatalog final
@@ -280,7 +280,7 @@ namespace zeus
 
     private:
         types::ZeusTarget* target_;
-        std::unique_ptr<Module> module_;
+        std::unique_ptr<ZeusServices> services_;
         types::ZeusIsolation isolation_;
         std::atomic<types::ZeusWorkerState> state_{types::ZeusWorkerState::idle};
         std::optional<ZeusCredential> last_pair_;

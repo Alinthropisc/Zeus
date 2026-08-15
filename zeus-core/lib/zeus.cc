@@ -14,7 +14,7 @@ namespace zeus
     inline constexpr std::string_view kProgram = "zeus";
     inline constexpr std::string_view kVersion = "v1.0";
 
-    ZeusOptions ZeusOptionsParser::parse(int argc, char **argv)
+    static ZeusOptions ZeusOptionsParser::parse(int argc, char **argv)
     {
         ZeusOptions opts;
         po::options_description desc("Zeus Options");
@@ -103,7 +103,7 @@ namespace zeus
                 {
                     throw std::runtime_error("unknown service: " + opts_.service);
                 }
-                auto worker = std::make_unique<ZeusWorker>(target, std::move(module), ZeusWorker::ZeusIsolation::thread);
+                auto worker = std::make_unique<ZeusWorker>(target, std::move(module), zeus::types::ZeusIsolation::thread);
                 worker->start(creds_, opts_.engine);
                 workers_.push_back(std::move(worker));
             }
